@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travelpedia Content Engine — Panel</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#fff; --ink:#1a1a18; --muted:#6b6b64; --line:#e4e4de;
+    --accent:#1f6f5c; --accent-soft:#e8f2ee;
+    --warn:#b4720f; --bad:#a63232; --good:#1f6f5c;
+    --chip:#efefe9; --hover:#f2f2ec;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15161a; --panel:#1d1f24; --ink:#eceae4; --muted:#98988f; --line:#2d3037;
+      --accent:#5fbfa3; --accent-soft:#20302c;
+      --warn:#e0a94a; --bad:#e2726e; --good:#5fbfa3;
+      --chip:#272a30; --hover:#24272d; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15161a; --panel:#1d1f24; --ink:#eceae4; --muted:#98988f; --line:#2d3037;
+    --accent:#5fbfa3; --accent-soft:#20302c;
+    --warn:#e0a94a; --bad:#e2726e; --good:#5fbfa3;
+    --chip:#272a30; --hover:#24272d; color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{border-bottom:1px solid var(--line);background:var(--panel);padding:12px 20px;
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+  header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .sp{flex:1}
+  nav{display:flex;gap:2px;background:var(--chip);padding:3px;border-radius:9px}
+  nav button{border:none;background:transparent;color:var(--muted);padding:6px 13px;
+    border-radius:7px;font:inherit;font-size:14px;cursor:pointer}
+  nav button.on{background:var(--panel);color:var(--ink);font-weight:560;
+    box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  main{max-width:1240px;margin:0 auto;padding:22px 20px 70px}
+  button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:7px;padding:6px 12px;cursor:pointer}
+  button:hover{border-color:var(--muted)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{opacity:.9}
+  button.mini{padding:3px 9px;font-size:13px;border-radius:6px}
+  button:disabled{opacity:.45;cursor:default}
+  input,select{font:inherit;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);border-radius:7px;padding:7px 10px}
+  .grid{display:grid;gap:13px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px}
+  .stat{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+  .stat small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:5px}
+  section{margin-top:24px}
+  section > h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 10px;font-weight:600}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;overflow:hidden}
+  th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);
+    vertical-align:top;font-size:14px}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    font-weight:600;background:var(--chip)}
+  tr:last-child td{border-bottom:none}
+  .wrap{overflow-x:auto}
+  .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;
+    background:var(--chip);color:var(--muted);white-space:nowrap}
+  .chip.good{color:var(--good)} .chip.bad{color:var(--bad)} .chip.warn{color:var(--warn)}
+  .muted{color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  a{color:var(--accent)}
+
+  /* takvim */
+  .cal{background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .calhead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr)}
+  .dow{padding:7px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);background:var(--chip);border-bottom:1px solid var(--line)}
+  .day{min-height:104px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding:7px 8px;position:relative}
+  .day:nth-child(7n){border-right:none}
+  .day.out{background:var(--bg);opacity:.55}
+  .day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+  .daynum{font-size:12px;color:var(--muted);margin-bottom:5px}
+  .day.pub .daynum::after{content:" • yayın günü";font-size:10px;color:var(--accent)}
+  .item{background:var(--accent-soft);border-radius:7px;padding:6px 7px;font-size:12.5px;
+    line-height:1.35;cursor:pointer;border:1px solid transparent}
+  .item:hover{border-color:var(--accent)}
+  .item .k{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+  .addslot{width:100%;border:1px dashed var(--line);background:transparent;color:var(--muted);
+    border-radius:7px;padding:5px;font-size:12px;cursor:pointer}
+  .addslot:hover{background:var(--hover);color:var(--ink)}
+  .legend{display:flex;gap:14px;padding:10px 16px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;
+    align-items:center;justify-content:center;padding:20px;z-index:50}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    width:min(560px,100%);max-height:80vh;overflow:auto;padding:20px}
+  .modal h3{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}
+  .pick{width:100%;text-align:left;margin-top:6px;padding:9px 11px}
+  .pick b{font-weight:560}
+
+  .setup{max-width:640px;margin:60px auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:26px}
+  .setup h2{margin-top:0;font-size:19px;letter-spacing:-.01em}
+  .setup ol{padding-left:20px;color:var(--muted);font-size:14px}
+  code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:13px}
+  .err{color:var(--bad);font-size:13px;margin-top:10px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);
+    color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;z-index:80}
+</style>
+</head>
+<body>
+
+<div id="setup" class="setup" hidden>
+  <h2>Panel'i GitHub'a bağla</h2>
+  <p class="muted">Panel verileri doğrudan repo'dan okur ve değişikliklerini oraya yazar.
+  Anahtar sadece bu tarayıcıda saklanır, hiçbir sunucuya gitmez.</p>
+  <ol>
+    <li>GitHub → Settings → Developer settings → <b>Personal access tokens</b> →
+        Fine-grained tokens → Generate new token</li>
+    <li>Repository access: <b>Only select repositories</b> →
+        <code>travelpedia-content-engine</code></li>
+    <li>Permissions: <code>Contents: Read and write</code>,
+        <code>Actions: Read and write</code>, <code>Metadata: Read</code></li>
+    <li>Anahtarı aşağıya yapıştır</li>
+  </ol>
+  <div class="row">
+    <input id="token" type="password" placeholder="github_pat_..." style="min-width:340px">
+    <button class="primary" onclick="saveToken()">Bağlan</button>
+  </div>
+  <div id="setupErr" class="err"></div>
+</div>
+
+<div id="app" hidden>
+<header>
+  <h1>Content Engine</h1>
+  <select id="siteSel" onchange="switchSite()"></select>
+  <nav id="tabs">
+    <button data-tab="dash" class="on" onclick="tab('dash')">Özet</button>
+    <button data-tab="cal" onclick="tab('cal')">Takvim</button>
+    <button data-tab="kw" onclick="tab('kw')">Anahtar kelimeler</button>
+    <button data-tab="qa" onclick="tab('qa')">Kalite kapısı</button>
+    <button data-tab="runs" onclick="tab('runs')">Çalışmalar</button>
+  </nav>
+  <span class="sp"></span>
+  <span id="updated" class="chip"></span>
+  <button onclick="load()">Yenile</button>
+  <button class="primary" id="runBtn" onclick="runNow()">Şimdi çalıştır</button>
+</header>
+
+<main>
+  <!-- ÖZET -->
+  <div id="v-dash">
+    <div class="grid" id="stats"></div>
+    <section>
+      <h2>Siteler</h2>
+      <div class="wrap"><table id="sites"><thead><tr>
+        <th>Site</th><th>Mod</th><th>Program</th><th>Takvimde</th>
+        <th>Kuyrukta</th><th>Yayınlanan</th><th>İç link hedefi</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+    <p class="muted" style="font-size:13px;margin-top:22px">
+      Gölge modundaki siteler içerik üretir, kalite kapısından geçirir, ama yayınlamaz.
+      Canlıya geçiş <code>sites/&lt;domain&gt;.yaml</code> içinde elle yapılır — panel
+      bunu bilerek değiştirmiyor.
+    </p>
+  </div>
+
+  <!-- TAKVİM -->
+  <div id="v-cal" hidden>
+    <div class="cal">
+      <div class="calhead">
+        <button class="mini" onclick="moveMonth(-1)">‹</button>
+        <b id="monthLabel"></b>
+        <button class="mini" onclick="moveMonth(1)">›</button>
+        <button class="mini" onclick="goToday()">Bugün</button>
+        <span class="sp"></span>
+        <button class="mini" onclick="autoFill()">Boş günleri doldur</button>
+      </div>
+      <div class="calgrid" id="dow"></div>
+      <div class="calgrid" id="calDays"></div>
+      <div class="legend">
+        <span><span class="chip good">yayınlandı</span></span>
+        <span><span class="chip">planlandı</span></span>
+        <span><span class="chip bad">kapıdan döndü</span></span>
+        <span class="muted">Yayın günleri site programından gelir. Bir yazıyı öne almak
+          için üstüne tıkla.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANAHTAR KELİMELER -->
+  <div id="v-kw" hidden>
+    <section style="margin-top:0">
+      <h2>Yeni anahtar kelime ekle</h2>
+      <div class="card">
+        <div class="row">
+          <input id="kwTopic" placeholder="Konu başlığı — örn. Bosphorus dinner cruise menu" style="flex:1;min-width:280px">
+          <input id="kwKey" placeholder="anahtar kelime" style="min-width:190px">
+          <input id="kwVol" type="number" placeholder="aylık hacim" style="width:130px">
+          <select id="kwDiff">
+            <option value="easy">kolay</option>
+            <option value="medium" selected>orta</option>
+            <option value="hard">zor</option>
+          </select>
+          <button class="primary" onclick="addKeyword()">Ekle</button>
+        </div>
+        <p class="muted" style="font-size:13px;margin:10px 0 0">
+          Konu kendi markalarından birine denk geliyorsa sistem otomatik eşleştirir ve
+          skorunu yükseltir — o yazı doğrudan rezervasyona gider.
+        </p>
+      </div>
+    </section>
+    <section>
+      <h2>Kuyruk</h2>
+      <div class="wrap"><table id="kwTable"><thead><tr>
+        <th>Konu</th><th>Anahtar kelime</th><th>Hacim</th><th>Kendi markası</th>
+        <th>Skor</th><th>Durum</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <!-- KALİTE KAPISI -->
+  <div id="v-qa" hidden>
+    <section style="margin-top:0">
+      <h2>Kapıdan dönen yazılar</h2>
+      <div class="wrap"><table id="rejected"><thead><tr>
+        <th>Konu</th><th>Gerekçe</th><th>Tarih</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+    <p class="muted" style="font-size:13px;margin-top:16px">
+      Kapının kontrol ettikleri: fact base'de olmayan rakam, eksik resmi kaynak linki,
+      minimum iç link sayısı, kırık link, mevcut yazılarla benzerlik, yasaklı kalıplar,
+      girişte ticari link, kısa SSS.
+    </p>
+  </div>
+
+  <!-- ÇALIŞMALAR -->
+  <div id="v-runs" hidden>
+    <section style="margin-top:0">
+      <h2>Son çalışmalar</h2>
+      <div class="wrap"><table id="runs"><thead><tr>
+        <th>Çalışma</th><th>Durum</th><th>Tetikleyen</th><th>Süre</th><th>Tarih</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toastHost"></div>
+
+<script>
+const OWNER = "Istambul-travel";
+const REPO  = "travelpedia-content-engine";
+const API   = `https://api.github.com/repos/${OWNER}/${REPO}`;
+const DOW   = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"];
+const DAYKEY = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+
+let TOKEN = null;
+let STATE = { sites: [], current: null, runs: [], month: new Date(), shas: {} };
+
+// ---------- yardımcılar ----------
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+function toast(msg){
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg;
+  $("toastHost").appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin = atob(b64.replace(/\n/g, ""));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+async function gh(path, opts = {}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { Authorization:`Bearer ${TOKEN}`, Accept:"application/vnd.github+json",
+               ...(opts.headers||{}) },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error("Anahtar geçersiz ya da yetkisiz");
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${(await res.text()).slice(0,140)}`);
+  return res.status === 204 ? true : res.json();
+}
+
+async function ghFile(path){
+  const meta = await gh(`/contents/${path}`);
+  if (!meta || !meta.content) return null;
+  STATE.shas[path] = meta.sha;
+  return b64decode(meta.content);
+}
+async function ghJson(path){
+  const t = await ghFile(path);
+  if (!t) return null;
+  try { return JSON.parse(t); } catch { return null; }
+}
+async function commitJson(path, obj, message){
+  const body = { message, content: b64encode(JSON.stringify(obj, null, 2)), branch:"main" };
+  if (STATE.shas[path]) body.sha = STATE.shas[path];
+  const res = await gh(`/contents/${path}`, { method:"PUT", body: JSON.stringify(body) });
+  if (res && res.content) STATE.shas[path] = res.content.sha;
+  return res;
+}
+
+function peekConfig(yaml){
+  const grab = (re) => (yaml.match(re) || [])[1];
+  return {
+    mode: grab(/^mode:\s*(\w+)/m) || "?",
+    perWeek: parseInt(grab(/posts_per_week:\s*(\d+)/m) || "0", 10),
+    days: (grab(/days:\s*\[([^\]]*)\]/m) || "").split(",").map(s => s.trim()).filter(Boolean),
+    brands: [...yaml.matchAll(/^\s+url:\s*https?:\/\/([^\/\s]+)/gm)].map(m => m[1]),
+  };
+}
+
+// ---------- oturum ----------
+function saveToken(){
+  const v = $("token").value.trim();
+  if (!v) return;
+  TOKEN = v;
+  gh("").then(repo => {
+    if (!repo) throw new Error("Repo bulunamadı");
+    try { localStorage.setItem("tce_token", v); } catch {}
+    $("setup").hidden = true; $("app").hidden = false;
+    load();
+  }).catch(e => { $("setupErr").textContent = e.message; TOKEN = null; });
+}
+
+// ---------- yükleme ----------
+async function load(){
+  $("updated").textContent = "yükleniyor…";
+  const listing = await gh("/contents/sites") || [];
+  const domains = listing.filter(f => f.name.endsWith(".yaml"))
+                         .map(f => f.name.replace(/\.yaml$/, ""));
+  const sites = [];
+  for (const domain of domains){
+    const yaml = await ghFile(`sites/${domain}.yaml`);
+    const cfg = yaml ? peekConfig(yaml) : {mode:"?", perWeek:0, days:[], brands:[]};
+    const [topicsDoc, published, linkIndex] = await Promise.all([
+      ghJson(`data/${domain}/topics.json`),
+      ghJson(`data/${domain}/published.json`),
+      ghJson(`data/${domain}/link-index.json`),
+    ]);
+    sites.push({ domain, ...cfg,
+      topicsDoc: topicsDoc || {topics:[]},
+      topics: (topicsDoc && topicsDoc.topics) || [],
+      published: published || [],
+      linkTargets: (linkIndex || []).length });
+  }
+  STATE.sites = sites;
+  if (!STATE.current || !sites.some(s => s.domain === STATE.current))
+    STATE.current = sites.length ? sites[0].domain : null;
+  STATE.runs = ((await gh("/actions/runs?per_page=15")) || {}).workflow_runs || [];
+
+  $("siteSel").innerHTML = sites.map(s =>
+    `<option value="${esc(s.domain)}" ${s.domain===STATE.current?"selected":""}>${esc(s.domain)}</option>`).join("");
+  renderAll();
+  $("updated").textContent = new Date().toLocaleString("tr-TR");
+}
+
+const site = () => STATE.sites.find(s => s.domain === STATE.current);
+
+function renderAll(){
+  renderStats(); renderSites(); renderCalendar(); renderKeywords();
+  renderRejected(); renderRuns();
+}
+
+function switchSite(){ STATE.current = $("siteSel").value; renderAll(); }
+
+function tab(name){
+  for (const b of $("tabs").children) b.classList.toggle("on", b.dataset.tab === name);
+  for (const v of ["dash","cal","kw","qa","runs"]) $("v-" + v).hidden = (v !== name);
+}
+
+// ---------- özet ----------
+function renderStats(){
+  const all = STATE.sites.flatMap(s => s.topics);
+  const publishedN = STATE.sites.reduce((n,s) => n + s.published.length, 0);
+  const scheduled = all.filter(t => t.scheduled_for && t.status === "pending").length;
+  const rejected  = all.filter(t => t.status === "rejected").length;
+  const links     = STATE.sites.reduce((n,s) => n + s.linkTargets, 0);
+  const live      = STATE.sites.filter(s => s.mode === "live").length;
+  const failed    = STATE.runs.filter(r => r.conclusion === "failure").length;
+  const cost      = (publishedN * 0.023).toFixed(2);
+
+  $("stats").innerHTML = [
+    [publishedN, "yayınlanan yazı"],
+    [scheduled, "takvimde planlı"],
+    [all.filter(t => t.status==="pending" && !t.scheduled_for).length, "kuyrukta bekleyen"],
+    [rejected, "kapıdan dönen", rejected ? "bad" : ""],
+    [links.toLocaleString("tr-TR"), "iç link hedefi"],
+    [`${live}/${STATE.sites.length}`, "canlı site"],
+    [`$${cost}`, "tahmini maliyet"],
+    [failed, "başarısız çalışma", failed ? "bad" : "good"],
+  ].map(([v,l,tone]) => `<div class="card"><div class="stat"
+      ${tone?`style="color:var(--${tone})"`:""}>${esc(v)}<small>${esc(l)}</small></div></div>`).join("");
+}
+
+function renderSites(){
+  $("sites").tBodies[0].innerHTML = STATE.sites.map(s => `<tr>
+      <td><a href="https://${esc(s.domain)}" target="_blank" rel="noopener">${esc(s.domain)}</a></td>
+      <td><span class="chip ${s.mode==="live"?"good":"warn"}">${s.mode==="live"?"canlı":"gölge"}</span></td>
+      <td>${s.perWeek}/hafta<br><span class="muted" style="font-size:12px">${esc(s.days.join(", "))}</span></td>
+      <td>${s.topics.filter(t => t.scheduled_for && t.status==="pending").length}</td>
+      <td>${s.topics.filter(t => t.status==="pending" && !t.scheduled_for).length}</td>
+      <td>${s.published.length}</td>
+      <td>${s.linkTargets.toLocaleString("tr-TR")}</td>
+    </tr>`).join("") || `<tr><td colspan="7" class="muted">Site yok</td></tr>`;
+}
+
+// ---------- takvim ----------
+function isPublishDay(s, date){
+  return s.days.includes(DAYKEY[(date.getDay() + 6) % 7]);
+}
+
+function nextFreeSlots(s, count, fromDate){
+  const taken = new Set(s.topics.filter(t => t.scheduled_for).map(t => t.scheduled_for));
+  const out = [];
+  const d = new Date(fromDate || new Date());
+  d.setHours(0,0,0,0);
+  for (let i = 0; i < 400 && out.length < count; i++, d.setDate(d.getDate()+1)){
+    if (!isPublishDay(s, d)) continue;
+    const key = iso(d);
+    if (taken.has(key)) continue;
+    out.push(key);
+  }
+  return out;
+}
+
+function moveMonth(delta){
+  STATE.month = new Date(STATE.month.getFullYear(), STATE.month.getMonth()+delta, 1);
+  renderCalendar();
+}
+function goToday(){ STATE.month = new Date(); renderCalendar(); }
+
+function renderCalendar(){
+  const s = site();
+  $("dow").innerHTML = DOW.map(d => `<div class="dow">${d}</div>`).join("");
+  if (!s){ $("calDays").innerHTML = ""; return; }
+
+  const y = STATE.month.getFullYear(), m = STATE.month.getMonth();
+  $("monthLabel").textContent = STATE.month.toLocaleDateString("tr-TR",{month:"long",year:"numeric"});
+
+  const first = new Date(y, m, 1);
+  const start = new Date(first);
+  start.setDate(1 - ((first.getDay() + 6) % 7));
+  const todayKey = iso(new Date());
+
+  const byDate = {};
+  for (const t of s.topics) if (t.scheduled_for) (byDate[t.scheduled_for] ||= []).push(t);
+
+  let html = "";
+  for (let i = 0; i < 42; i++){
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const key = iso(d);
+    const out = d.getMonth() !== m;
+    const pub = isPublishDay(s, d);
+    const items = byDate[key] || [];
+    html += `<div class="day ${out?"out":""} ${pub?"pub":""} ${key===todayKey?"today":""}">
+      <div class="daynum">${d.getDate()}</div>`;
+    for (const t of items){
+      const tone = t.status === "published" ? "good" : t.status === "rejected" ? "bad" : "";
+      html += `<div class="item" onclick="openItem('${esc(key)}','${esc(t.topic).replace(/'/g,"\\'")}')">
+          ${esc(t.topic)}<span class="k">${esc(t.keyword||"")}
+          ${tone?`<span class="chip ${tone}">${esc(t.status)}</span>`:""}</span></div>`;
+    }
+    if (pub && !items.length && !out)
+      html += `<button class="addslot" onclick="openPicker('${key}')">+ yazı ata</button>`;
+    html += `</div>`;
+  }
+  $("calDays").innerHTML = html;
+}
+
+function openPicker(dateKey){
+  const s = site();
+  const pool = s.topics.filter(t => t.status === "pending" && !t.scheduled_for)
+                       .sort((a,b) => (b.score||0)-(a.score||0));
+  modal(`${dateKey} için yazı seç`, pool.length
+    ? pool.slice(0,25).map(t => `<button class="pick" onclick="assign('${dateKey}',${JSON.stringify(t.topic).replace(/"/g,"&quot;")})">
+        <b>${esc(t.topic)}</b><br><span class="muted" style="font-size:13px">
+        ${esc(t.keyword||"")} · skor ${(t.score??0).toFixed(2)}
+        ${t.own_brand?` · <span class="chip good">${esc(t.own_brand)}</span>`:""}</span></button>`).join("")
+    : `<p class="muted">Kuyrukta atanmamış konu yok. "Anahtar kelimeler" sekmesinden ekleyebilirsin.</p>`);
+}
+
+function openItem(dateKey, topicText){
+  const s = site();
+  const t = s.topics.find(x => x.topic === topicText);
+  if (!t) return;
+  const slots = nextFreeSlots(s, 1);
+  modal(esc(t.topic), `
+    <p class="muted" style="font-size:13.5px">${esc(t.keyword||"")} · skor ${(t.score??0).toFixed(2)}
+      · ${esc(t.status)}${t.own_brand?` · <span class="chip good">${esc(t.own_brand)}</span>`:""}</p>
+    <p class="muted" style="font-size:13px">Planlandığı gün: ${esc(dateKey)}</p>
+    <div class="row" style="margin-top:14px">
+      ${slots.length && slots[0] < dateKey
+        ? `<button class="primary" onclick="assign('${slots[0]}',${JSON.stringify(t.topic).replace(/"/g,"&quot;")})">En yakın güne çek (${slots[0]})</button>`
+        : ``}
+      <button onclick="unassign(${JSON.stringify(t.topic).replace(/"/g,"&quot;")})">Takvimden çıkar</button>
+    </div>`);
+}
+
+async function assign(dateKey, topicText){
+  const s = site();
+  const t = s.topics.find(x => x.topic === topicText);
+  if (!t) return;
+  t.scheduled_for = dateKey;
+  await saveTopics(`takvim: ${topicText} → ${dateKey}`);
+  closeModal(); renderAll(); toast("Takvime alındı");
+}
+
+async function unassign(topicText){
+  const s = site();
+  const t = s.topics.find(x => x.topic === topicText);
+  if (!t) return;
+  delete t.scheduled_for;
+  await saveTopics(`takvimden çıkarıldı: ${topicText}`);
+  closeModal(); renderAll(); toast("Takvimden çıkarıldı");
+}
+
+async function autoFill(){
+  const s = site();
+  const pool = s.topics.filter(t => t.status === "pending" && !t.scheduled_for)
+                       .sort((a,b) => (b.score||0)-(a.score||0));
+  if (!pool.length) return toast("Atanacak konu yok");
+  const slots = nextFreeSlots(s, pool.length);
+  slots.forEach((slot, i) => { if (pool[i]) pool[i].scheduled_for = slot; });
+  await saveTopics(`takvim otomatik dolduruldu (${Math.min(pool.length, slots.length)} yazı)`);
+  renderAll(); toast(`${Math.min(pool.length, slots.length)} yazı takvime alındı`);
+}
+
+// ---------- anahtar kelimeler ----------
+function renderKeywords(){
+  const s = site();
+  if (!s) return;
+  const rows = [...s.topics].sort((a,b) => (b.score||0)-(a.score||0));
+  $("kwTable").tBodies[0].innerHTML = rows.map(t => {
+    const j = JSON.stringify(t.topic).replace(/"/g,"&quot;");
+    return `<tr>
+      <td>${esc(t.topic)}</td>
+      <td class="muted">${esc(t.keyword||"")}</td>
+      <td class="muted">${t.volume ? t.volume.toLocaleString("tr-TR")+"/ay" : "—"}
+        ${t.difficulty?`<br><span class="chip">${esc(t.difficulty)}</span>`:""}</td>
+      <td>${t.own_brand?`<span class="chip good">${esc(t.own_brand)}</span>`
+            : t.affiliate?`<span class="chip">affiliate</span>` : `<span class="muted">—</span>`}</td>
+      <td>${(t.score??0).toFixed(2)}
+        <div class="row" style="gap:4px;margin-top:4px">
+          <button class="mini" onclick="bump(${j},0.05)">+</button>
+          <button class="mini" onclick="bump(${j},-0.05)">−</button>
+        </div></td>
+      <td><span class="chip ${t.status==="published"?"good":t.status==="rejected"?"bad":""}">${esc(t.status)}</span>
+        ${t.scheduled_for?`<br><span class="muted" style="font-size:12px">${esc(t.scheduled_for)}</span>`:""}</td>
+      <td>${t.status==="pending" && !t.scheduled_for
+            ? `<button class="mini" onclick="quickSchedule(${j})">Takvime ekle</button>` : ""}
+        ${t.status==="pending" ? `<button class="mini" onclick="dropTopic(${j})">Çıkar</button>`:""}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="muted">Kuyruk boş</td></tr>`;
+}
+
+async function addKeyword(){
+  const s = site();
+  const topic = $("kwTopic").value.trim();
+  if (!topic) return toast("Konu başlığı gerekli");
+  const keyword = $("kwKey").value.trim();
+  const volume = parseInt($("kwVol").value || "0", 10) || null;
+  const difficulty = $("kwDiff").value;
+
+  const brand = matchBrand(s, topic + " " + keyword);
+  // ticari eşleşme skoru yükseltir — sistemin Soro'dan ayrıldığı nokta
+  let score = 0.45 + (brand ? 0.30 : 0)
+            + (volume ? Math.min(0.15, volume / 10000) : 0)
+            + (difficulty === "easy" ? 0.05 : difficulty === "hard" ? -0.05 : 0);
+  score = Math.max(0, Math.min(0.99, score));
+
+  s.topics.push({ topic, keyword, volume, difficulty,
+    own_brand: brand || null, score: +score.toFixed(2), status: "pending",
+    added_by: "panel", added_at: new Date().toISOString().slice(0,10) });
+  await saveTopics(`anahtar kelime eklendi: ${topic}`);
+  $("kwTopic").value = $("kwKey").value = $("kwVol").value = "";
+  renderAll(); toast(brand ? `Eklendi — ${brand} ile eşleşti` : "Eklendi");
+}
+
+function matchBrand(s, text){
+  const lower = text.toLowerCase();
+  const map = {
+    "bosporuscruise.com":["bosphorus","bosporus","dinner cruise","yacht","sunset cruise","boat tour"],
+    "goldenhorncruise.com":["golden horn","halic","miniaturk","pierre loti","eyup"],
+    "istanbulhamam.com":["hamam","hammam","turkish bath","cemberlitas","cagaloglu","spa"],
+    "camlicatower.com":["camlica","panoramic","observation","asian side view"],
+    "cisternoftheodosius.com":["cistern","serefiye","theodosius","dervish"],
+  };
+  for (const [domain, words] of Object.entries(map))
+    if (s.brands.includes(domain) && words.some(w => lower.includes(w))) return domain;
+  return null;
+}
+
+async function bump(topicText, delta){
+  const s = site();
+  const t = s.topics.find(x => x.topic === topicText);
+  if (!t) return;
+  t.score = +Math.max(0, Math.min(0.99, (t.score||0) + delta)).toFixed(2);
+  await saveTopics(`skor güncellendi: ${topicText} → ${t.score}`);
+  renderAll();
+}
+
+async function quickSchedule(topicText){
+  const s = site();
+  const slot = nextFreeSlots(s, 1)[0];
+  if (!slot) return toast("Uygun yayın günü bulunamadı");
+  await assign(slot, topicText);
+}
+
+async function dropTopic(topicText){
+  const s = site();
+  s.topicsDoc.topics = s.topics = s.topics.filter(x => x.topic !== topicText);
+  await saveTopics(`kuyruktan çıkarıldı: ${topicText}`);
+  renderAll(); toast("Çıkarıldı");
+}
+
+async function saveTopics(message){
+  const s = site();
+  s.topicsDoc.topics = s.topics;
+  try {
+    await commitJson(`data/${s.domain}/topics.json`, s.topicsDoc, message);
+  } catch(e){
+    toast("Kaydedilemedi: " + e.message);
+    throw e;
+  }
+}
+
+// ---------- kalite kapısı / çalışmalar ----------
+function renderRejected(){
+  const s = site();
+  const rows = s ? s.topics.filter(t => t.status === "rejected") : [];
+  $("rejected").tBodies[0].innerHTML = rows.map(t => {
+    const j = JSON.stringify(t.topic).replace(/"/g,"&quot;");
+    return `<tr>
+      <td>${esc(t.topic)}</td>
+      <td class="muted">${esc(t.rejected_reason||"")}</td>
+      <td class="muted">${esc((t.rejected_at||"").slice(0,16).replace("T"," "))}</td>
+      <td><button class="mini" onclick="retry(${j})">Tekrar dene</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="4" class="muted">Henüz reddedilen yazı yok</td></tr>`;
+}
+
+async function retry(topicText){
+  const s = site();
+  const t = s.topics.find(x => x.topic === topicText);
+  if (!t) return;
+  t.status = "pending"; delete t.rejected_reason; delete t.rejected_at; delete t.scheduled_for;
+  await saveTopics(`tekrar kuyruğa alındı: ${topicText}`);
+  renderAll(); toast("Kuyruğa geri alındı");
+}
+
+function renderRuns(){
+  const tone = r => r.conclusion==="success"?"good":r.conclusion==="failure"?"bad"
+                  :(r.status==="in_progress"||r.status==="queued")?"warn":"";
+  $("runs").tBodies[0].innerHTML = STATE.runs.slice(0,12).map(r => {
+    const secs = r.run_started_at && r.updated_at
+      ? Math.max(0, Math.round((new Date(r.updated_at)-new Date(r.run_started_at))/1000)) : null;
+    return `<tr>
+      <td><a href="${esc(r.html_url)}" target="_blank" rel="noopener">${esc(r.name)} #${r.run_number}</a></td>
+      <td><span class="chip ${tone(r)}">${esc(r.conclusion||r.status)}</span></td>
+      <td class="muted">${esc(r.event)}</td>
+      <td class="muted">${secs===null?"—":secs+" sn"}</td>
+      <td class="muted">${new Date(r.created_at).toLocaleString("tr-TR")}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="muted">Çalışma yok</td></tr>`;
+}
+
+async function runNow(){
+  const btn = $("runBtn");
+  btn.disabled = true; btn.textContent = "başlatılıyor…";
+  try{
+    await gh("/actions/workflows/daily.yml/dispatches",
+      { method:"POST", body: JSON.stringify({ref:"main", inputs:{}}) });
+    toast("Çalışma başlatıldı");
+    setTimeout(() => { load(); btn.textContent="Şimdi çalıştır"; btn.disabled=false; }, 6000);
+  }catch(e){
+    toast("Başlatılamadı: " + e.message);
+    btn.textContent = "Şimdi çalıştır"; btn.disabled = false;
+  }
+}
+
+// ---------- modal ----------
+function modal(title, bodyHtml){
+  $("modalHost").innerHTML = `<div class="backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="modal"><h3>${title}</h3>${bodyHtml}
+      <div style="margin-top:16px"><button onclick="closeModal()">Kapat</button></div>
+    </div></div>`;
+}
+function closeModal(){ $("modalHost").innerHTML = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+// ---------- açılış ----------
+try { TOKEN = localStorage.getItem("tce_token"); } catch { TOKEN = null; }
+if (TOKEN){
+  $("app").hidden = false;
+  load().catch(e => { $("app").hidden = true; $("setup").hidden = false;
+                      $("setupErr").textContent = e.message; });
+} else {
+  $("setup").hidden = false;
+}
+</script>
+</body>
+</html>
