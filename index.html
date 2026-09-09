@@ -564,6 +564,7 @@ function vKw(){
         <button class="btn sm" onclick="bump(${j},-.05)">−</button>`:""}
         ${t.status==="pending"&&!t.scheduled_for?`<button class="btn sm" onclick="quick(${j})">Takvime ekle</button>`:""}
         ${t.status==="pending"?`<button class="btn sm" onclick="drop(${j})">Çıkar</button>`:""}
+        ${t.status!=="pending"?`<button class="btn sm" onclick="requeue(${j})">Yeniden üret</button>`:""}
       </div></div>`;
   }).join("") : empty("inbox","Kuyruk boş","Yukarıdaki formdan konu ekleyebilirsin.");
 
@@ -746,6 +747,16 @@ async function retry(topic){
   const s=site(), t=s.topics.find(x=>x.topic===topic); if(!t)return;
   t.status="pending"; delete t.rejected_reason; delete t.rejected_at; delete t.scheduled_for;
   await save(`tekrar kuyruğa: ${topic}`); render(); toast("Kuyruğa geri alındı");
+}
+// Yayınlanmış ya da taslağa alınmış bir konuyu tekrar ürettirmek için:
+// fact base güncellendiğinde eski yazıyı yeni veriyle yeniden yazdırmak istiyorsun.
+async function requeue(topic){
+  const s=site(), t=s.topics.find(x=>x.topic===topic); if(!t)return;
+  const was=t.status;
+  t.status="pending"; delete t.rejected_reason; delete t.rejected_at; delete t.scheduled_for;
+  t.requeued_from=was; t.requeued_at=new Date().toISOString().slice(0,10);
+  await save(`yeniden üretime alındı: ${topic} (${was})`);
+  render(); toast("Kuyruğa alındı — sıradaki çalıştırmada yeniden üretilecek");
 }
 async function save(msg){
   const s=site(); s.doc.topics=s.topics;
