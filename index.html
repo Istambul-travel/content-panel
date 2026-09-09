@@ -547,6 +547,7 @@ function vKw(){
     const j=JSON.stringify(t.topic).replace(/"/g,"&quot;");
     const st=t.status==="published"?`<span class="pill"><span class="dot"></span>yayınlandı</span>`
       :t.status==="rejected"?`<span class="pill red"><span class="dot"></span>kapıdan döndü</span>`
+      :t.status==="drafted"?`<span class="pill blue"><span class="dot"></span>taslak hazır</span>`
       :t.scheduled_for?`<span class="pill blue">${esc(fmtDate(t.scheduled_for))}</span>`
       :`<span class="pill">kuyrukta</span>`;
     return `<div class="kwrow">
