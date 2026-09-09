@@ -183,6 +183,35 @@ tbody tr:hover{background:var(--raised)}
   text-align:right}
 .acts{display:flex;gap:6px;align-items:center}
 
+/* ---------- seo skoru ---------- */
+.gr{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+  background:var(--surface);border-radius:99px;padding:2px 4px 2px 9px;cursor:pointer;
+  font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.gr:hover{border-color:var(--brand)}
+.gr b{font-weight:600}
+.gr i{font-style:normal;width:19px;height:19px;border-radius:99px;display:grid;
+  place-items:center;font-size:11px;font-weight:700;color:#fff;background:var(--muted)}
+.gr.g-A i{background:var(--brand)} .gr.g-B i{background:#3f7fb8}
+.gr.g-C i{background:var(--amber)} .gr.g-D i,.gr.g-E i{background:var(--red)}
+.bar{height:5px;border-radius:99px;background:var(--line-2);overflow:hidden}
+.bar>span{display:block;height:100%;border-radius:99px;background:var(--brand)}
+.bar.mid>span{background:var(--amber)} .bar.low>span{background:var(--red)}
+.lens{display:grid;grid-template-columns:1fr;gap:10px;padding:15px 17px}
+.lensrow{display:grid;grid-template-columns:150px 1fr 74px;gap:12px;align-items:center;
+  font-size:13px}
+.lensrow .nm{color:var(--ink-2)} .lensrow .vl{text-align:right;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.chk{padding:10px 0;border-bottom:1px solid var(--line-2)}
+.chk:last-child{border-bottom:none}
+.chk .top{display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+.chk .top b{font-weight:540;flex:1}
+.chk .top span{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.chk .ms{font-size:12.5px;color:var(--muted);margin:4px 0 6px}
+.chk .ad{font-size:12.5px;color:var(--amber);margin-top:5px;line-height:1.5}
+.lenshead{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+  font-weight:640;margin:16px 0 2px}
+.lenshead:first-child{margin-top:4px}
+
 .addbar{display:flex;gap:9px;padding:14px 17px;flex-wrap:wrap;align-items:center;
   background:var(--raised);border-bottom:1px solid var(--line-2)}
 .addbar input,.addbar select{border:1px solid var(--line);background:var(--surface);
@@ -268,6 +297,7 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="cal" data-ico="cal" onclick="go('cal')"><span>Takvim</span><span class="count" id="cCal">0</span></button>
       <button data-v="kw" data-ico="key" onclick="go('kw')"><span>Anahtar kelimeler</span><span class="count" id="cKw">0</span></button>
       <div class="lbl">Denetim</div>
+      <button data-v="seo" data-ico="gauge" onclick="go('seo')"><span>SEO skoru</span><span class="count" id="cSeo">0</span></button>
       <button data-v="qa" data-ico="shield" onclick="go('qa')"><span>Kalite kapısı</span><span class="count" id="cQa">0</span></button>
       <button data-v="runs" data-ico="play" onclick="go('runs')"><span>Çalışmalar</span></button>
       <button data-v="sites" data-ico="globe" onclick="go('sites')"><span>Siteler</span></button>
@@ -327,6 +357,7 @@ function ico(name){
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     alert:'<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
     inbox:'<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5z"/>',
+    gauge:'<path d="M4 18a8 8 0 1116 0"/><path d="M12 18l4.5-5"/><circle cx="12" cy="18" r="1.4"/>',
     money:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.8-1.5-3-1.5-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2c-1.2 0-2.4-.5-3-1.5M12 6.5v11"/>',
   }[name]||"";
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
@@ -409,22 +440,163 @@ function render(){
     $("cCal").textContent=s.topics.filter(t=>t.scheduled_for&&t.status==="pending").length;
     $("cKw").textContent=s.topics.filter(t=>t.status==="pending").length;
     $("cQa").textContent=s.topics.filter(t=>t.status==="rejected").length;
+    $("cSeo").textContent=scored(s).length;
   }
   const meta={
     dash:["Özet","Sistemin bugünkü durumu"],
     cal:["Takvim","Hangi yazı hangi gün çıkacak"],
     kw:["Anahtar kelimeler","Konu kuyruğu ve öncelikler"],
+    seo:["SEO skoru","Her yazının SEO, AEO ve GEO ölçümü"],
     qa:["Kalite kapısı","Yayınlanmadan reddedilen yazılar"],
     runs:["Çalışmalar","Otomasyonun geçmişi"],
     sites:["Siteler","Bağlı sitelerin durumu"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,qa:vQa,runs:vRuns,sites:vSites})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites})[VIEW]();
 }
 
 /* ===================== görünümler ===================== */
 function empty(icon,title,text){
   return `<div class="empty">${ico(icon)}<b>${esc(title)}</b><p>${text}</p></div>`;
+}
+
+/* ===================== seo / aeo / geo skoru ===================== */
+/* Soro tek bir opak sayı gösteriyor ("SEO Level 6") — neyin ölçüldüğü ve neyi
+   düzelteceğin belli değil. Burada puan üç mercekten oluşuyor, her maddenin
+   ölçülen değeri ve düzeltme talimatı ayrı ayrı görünüyor. */
+const LENS_INFO={
+  SEO:["Arama motoru","Başlık, meta, hiyerarşi, anahtar kelime, slug, iç link"],
+  AEO:["Cevap motoru","Cevap-önce yapı, soru başlıkları, SSS, alıntılanabilirlik"],
+  GEO:["Üretken motor","Kaynaklı veri, açık tanım, resmi atıf, paragraf ritmi"],
+};
+const scored=s=>s.topics.filter(t=>t.seo&&typeof t.seo.total==="number");
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const barCls=r=>r>=.8?"":r>=.5?"mid":"low";
+
+function grBadge(t){
+  const j=JSON.stringify(t.topic).replace(/"/g,"&quot;");
+  const g=t.seo.grade||"—";
+  return `<button class="gr g-${esc(g)}" onclick="openSeo(${j})"
+    title="Puan dökümünü aç"><b>${Math.round(t.seo.total)}</b>
+    <span style="color:var(--muted)">/100</span><i>${esc(g)}</i></button>`;
+}
+
+function lensBars(seo){
+  return Object.entries(LENS_INFO).map(([k,[nm,]])=>{
+    const l=(seo.lenses||{})[k]; if(!l) return "";
+    const r=l.max?l.points/l.max:0;
+    return `<div class="lensrow"><div class="nm">${esc(k)} · ${esc(nm)}</div>
+      <div class="bar ${barCls(r)}"><span style="width:${(r*100).toFixed(0)}%"></span></div>
+      <div class="vl">${l.points} / ${l.max}</div></div>`;
+  }).join("");
+}
+
+function openSeo(topic){
+  const s=site(), t=s.topics.find(x=>x.topic===topic);
+  if(!t||!t.seo) return;
+  const seo=t.seo, checks=seo.checks||[];
+  let body=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div style="font-size:34px;font-weight:640;letter-spacing:-.03em;
+      font-variant-numeric:tabular-nums">${Math.round(seo.total)}</div>
+    <div style="font-size:12.5px;color:var(--muted);line-height:1.5">/ 100 · not ${esc(seo.grade||"—")}<br>
+      ${checks.length} ölçüm, üç mercek</div></div>
+    <div style="display:grid;gap:9px;margin-bottom:6px">${lensBars(seo)}</div>`;
+
+  for(const [k,[nm,desc]] of Object.entries(LENS_INFO)){
+    const rows=checks.filter(c=>c.lens===k);
+    if(!rows.length) continue;
+    body+=`<div class="lenshead">${esc(k)} — ${esc(nm)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">${esc(desc)}</div>`;
+    for(const c of rows.sort((a,b)=>(a.points/a.max)-(b.points/b.max))){
+      const r=c.max?c.points/c.max:0;
+      body+=`<div class="chk">
+        <div class="top"><b>${esc(c.label)}</b><span>${c.points} / ${c.max}</span></div>
+        <div class="ms">${esc(c.measured||"")}</div>
+        <div class="bar ${barCls(r)}"><span style="width:${(r*100).toFixed(0)}%"></span></div>
+        ${r<1&&c.advice?`<div class="ad">${esc(c.advice)}</div>`:""}</div>`;
+    }
+  }
+  modal(t.title||t.topic, body, "Puan yayını durdurmaz — onu kalite kapısı yapar. Eşiğin altındaki yazı ikinci kez, bu maddeler düzeltme talimatı olarak verilerek üretilir.");
+}
+
+function vSeo(){
+  const s=site(); if(!s) return empty("globe","Site yok","");
+  const rows=scored(s).sort((a,b)=>b.seo.total-a.seo.total);
+  if(!rows.length) return `<div class="panelbox" style="margin-top:0">
+    <header><h2>Puanlanmış yazı yok</h2></header>
+    ${empty("gauge","Henüz ölçüm yok",
+      "Sistem bir yazı ürettiğinde SEO, AEO ve GEO puanı burada maddeleriyle görünecek.")}</div>`;
+
+  const totals=rows.map(t=>t.seo.total);
+  const lensAvg={};
+  for(const k of Object.keys(LENS_INFO)){
+    const vals=rows.map(t=>(t.seo.lenses||{})[k]).filter(Boolean);
+    if(vals.length) lensAvg[k]={points:+avg(vals.map(v=>v.points)).toFixed(1),max:vals[0].max};
+  }
+
+  // Sistematik zayıflık: tek yazıda düşük çıkan madde tesadüf, her yazıda düşük
+  // çıkan madde kural sorunudur. Soro'da olmayan kısım bu.
+  const agg={};
+  for(const t of rows) for(const c of t.seo.checks||[]){
+    const a=agg[c.key]||={label:c.label,lens:c.lens,max:c.max,sum:0,n:0,advice:c.advice};
+    a.sum+=c.points; a.n++; if(c.advice)a.advice=c.advice;
+  }
+  const weak=Object.values(agg).map(a=>({...a,ratio:a.max?(a.sum/a.n)/a.max:1}))
+    .filter(a=>a.ratio<0.85).sort((a,b)=>a.ratio-b.ratio).slice(0,6);
+
+  const tiles=`<div class="tiles">
+    <div class="tile accent"><div class="lab">${ico('gauge')}Ortalama puan</div>
+      <div class="num">${avg(totals).toFixed(0)}</div>
+      <div class="sub">${rows.length} yazı · en düşük ${Math.min(...totals).toFixed(0)}, en yüksek ${Math.max(...totals).toFixed(0)}</div></div>
+    ${Object.entries(lensAvg).map(([k,l])=>`<div class="tile"><div class="lab">${ico('check')}${esc(k)} ortalaması</div>
+      <div class="num">${l.points}<span style="font-size:15px;color:var(--muted)"> / ${l.max}</span></div>
+      <div class="sub">${esc(LENS_INFO[k][0])}</div></div>`).join("")}
+  </div>`;
+
+  const list=`<div class="panelbox"><header><h2>Yazı bazında</h2><span class="sp"></span>
+    <span class="hint">Puana tıkla, madde madde dökümü aç</span></header>
+    ${rows.map(t=>`<div class="kwrow">
+      <div class="main"><div class="t">${esc(t.title||t.topic)}</div>
+        <div class="m">${Object.keys(LENS_INFO).map(k=>{
+          const l=(t.seo.lenses||{})[k]; return l?`<span>${esc(k)} ${l.points}/${l.max}</span>`:"";
+        }).join("")}
+        ${t.status==="published"?`<span class="pill"><span class="dot"></span>yayınlandı</span>`
+          :t.status==="drafted"?`<span class="pill blue"><span class="dot"></span>taslak</span>`
+          :t.status==="rejected"?`<span class="pill red"><span class="dot"></span>kapıdan döndü</span>`:""}
+        </div></div>
+      ${grBadge(t)}</div>`).join("")}</div>`;
+
+  const weakBox=weak.length?`<div class="panelbox">
+    <header><h2>Sistematik zayıflıklar</h2><span class="sp"></span>
+      <span class="hint">Yazıların ortalamasında puan kaybettiren maddeler</span></header>
+    <div style="padding:4px 17px 12px">
+    ${weak.map(a=>`<div class="chk">
+      <div class="top"><b>${esc(a.label)}</b><span>${esc(a.lens)} · ort. ${(a.sum/a.n).toFixed(1)} / ${a.max}</span></div>
+      <div class="bar ${barCls(a.ratio)}"><span style="width:${(a.ratio*100).toFixed(0)}%"></span></div>
+      ${a.advice?`<div class="ad">${esc(a.advice)}</div>`:""}</div>`).join("")}
+    </div>
+    <div style="padding:0 17px 15px;font-size:12.5px;color:var(--muted);line-height:1.6">
+      Tek yazıda düşük çıkan madde tesadüf olabilir; her yazıda düşük çıkan madde
+      yazım kuralının eksik olduğunu gösterir. Bu liste uzun süre aynı kalıyorsa
+      düzeltilecek yer <code>engine/writer.py</code> içindeki kural bloğudur.
+    </div></div>`:"";
+
+  const howBox=`<div class="panelbox"><header><h2>Puan nasıl hesaplanıyor</h2></header>
+    <div class="lens">
+      ${Object.entries(LENS_INFO).map(([k,[nm,desc]])=>`<div>
+        <div style="font-size:13.5px;font-weight:540">${esc(k)} — ${esc(nm)}
+          <span style="color:var(--muted);font-weight:400"> · ${(lensAvg[k]||{}).max||0} puan</span></div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">${esc(desc)}</div>
+      </div>`).join("")}
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.65;border-top:1px solid var(--line-2);padding-top:11px">
+        Her madde ölçülen değeriyle raporlanıyor — "puan 6" değil, "başlık 63 karakter,
+        hedef 40-60". Eşiğin (<code>min_seo_score</code>) altında kalan yazı ikinci kez
+        üretiliyor ve en zayıf dört madde modele düzeltme talimatı olarak veriliyor.
+        Puan tek başına yayını durdurmaz; onu kalite kapısı yapar.
+      </div>
+    </div></div>`;
+
+  return tiles + list + weakBox + howBox;
 }
 
 function vDash(){
@@ -447,6 +619,15 @@ function vDash(){
       <div class="num">${sched}</div><div class="sub">${all.filter(t=>t.status==="pending"&&!t.scheduled_for).length} konu kuyrukta bekliyor</div></div>
     <div class="tile ${rej?'badt':''}"><div class="lab">${ico('shield')}Kapıdan dönen</div>
       <div class="num">${rej}</div><div class="sub">${rej?"gerekçeleri Kalite kapısında":"kural ihlali yok"}</div></div>
+    ${(()=>{const sc=S.sites.flatMap(scored);
+      if(!sc.length) return `<div class="tile"><div class="lab">${ico('gauge')}Ortalama SEO puanı</div>
+        <div class="num" style="color:var(--muted)">—</div><div class="sub">henüz ölçülmüş yazı yok</div></div>`;
+      const a=avg(sc.map(t=>t.seo.total));
+      const cls=a>=70?"accent":a>=55?"warnt":"badt";
+      const low=sc.filter(t=>t.seo.total<65).length;
+      return `<div class="tile ${cls}"><div class="lab">${ico('gauge')}Ortalama SEO puanı</div>
+        <div class="num">${a.toFixed(0)}<span style="font-size:15px;color:var(--muted)"> /100</span></div>
+        <div class="sub">${sc.length} yazı${low?` · ${low} tanesi eşiğin altında`:" · hepsi eşiğin üstünde"}</div></div>`;})()}
     <div class="tile"><div class="lab">${ico('money')}Tahmini maliyet</div>
       <div class="num">$${(pubN*COST_PER_ARTICLE).toFixed(2)}</div>
       <div class="sub">makale başı ≈ 2,3 sent</div></div>
@@ -558,8 +739,9 @@ function vKw(){
         ${t.own_brand?`<span class="pill brand">${esc(t.own_brand)}</span>`
           :t.affiliate?`<span class="pill">affiliate</span>`:""}
       </div></div>
+      ${t.seo&&typeof t.seo.total==="number"?grBadge(t):""}
       ${st}
-      <div class="score">${(t.score??0).toFixed(2)}</div>
+      <div class="score" title="konu önceliği">${(t.score??0).toFixed(2)}</div>
       <div class="acts">
         ${t.status==="pending"?`<button class="btn sm" onclick="bump(${j},.05)">+</button>
         <button class="btn sm" onclick="bump(${j},-.05)">−</button>`:""}
@@ -594,6 +776,7 @@ function vQa(){
       <div class="t">${esc(t.topic)}</div>
       <div class="m"><span class="pill red">${esc(t.rejected_reason||"gerekçe yok")}</span>
       ${t.rejected_at?`<span>${esc(t.rejected_at.slice(0,10))}</span>`:""}</div></div>
+      ${t.seo&&typeof t.seo.total==="number"?grBadge(t):""}
       <div class="acts"><button class="btn sm" onclick="retry(${j})">Kuyruğa geri al</button></div></div>`;
   }).join("") : empty("shield","Reddedilen yazı yok",
       "Kalite kapısı henüz hiçbir yazıyı geri çevirmedi. Sistem içerik üretmeye başlayınca burada gerekçeleriyle listelenecekler.");
