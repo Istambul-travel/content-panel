@@ -288,9 +288,11 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
   <aside>
     <div class="brand">
       <div class="mark">T</div>
-      <div><b>Content Engine</b><span>Travelpedia</span></div>
+      <div><b>Content Engine</b><span id="brandSub">Travelpedia</span></div>
     </div>
-    <div class="sitepick"><select id="siteSel" onchange="switchSite()"></select></div>
+    <!-- Site seçici yalnızca birden fazla site varken görünür. Tek site
+         varken açılır liste "burada başka siteler de var" izlenimi veriyordu. -->
+    <div class="sitepick" id="sitePick" hidden><select id="siteSel" onchange="switchSite()"></select></div>
     <nav id="nav">
       <div class="lbl">Yönetim</div>
       <button data-v="dash" data-ico="grid" onclick="go('dash')"><span>Özet</span></button>
@@ -300,7 +302,7 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="seo" data-ico="gauge" onclick="go('seo')"><span>SEO skoru</span><span class="count" id="cSeo">0</span></button>
       <button data-v="qa" data-ico="shield" onclick="go('qa')"><span>Kalite kapısı</span><span class="count" id="cQa">0</span></button>
       <button data-v="runs" data-ico="play" onclick="go('runs')"><span>Çalışmalar</span></button>
-      <button data-v="sites" data-ico="globe" onclick="go('sites')"><span>Siteler</span></button>
+      <button data-v="sites" data-ico="globe" onclick="go('sites')"><span>Site ve markalar</span></button>
     </nav>
     <div class="asidefoot">
       <div id="footStatus">—</div>
@@ -393,7 +395,40 @@ function peek(y){
   return{mode:g(/^mode:\s*(\w+)/m)||"?",
     perWeek:parseInt(g(/posts_per_week:\s*(\d+)/m)||"0",10),
     days:(g(/days:\s*\[([^\]]*)\]/m)||"").split(",").map(s=>s.trim()).filter(Boolean),
-    brands:[...y.matchAll(/^\s+url:\s*https?:\/\/([^\/\s]+)/gm)].map(m=>m[1])};
+    social:g(/instagram_handle:\s*(\S+)/m)||"",
+    brands:ownBrands(y)};
+}
+
+/* link_map.own_brands: markanın adresi + hangi konularda devreye girdiği.
+   Bunlar sistemde YÖNETİLEN site değil — istambul.com yazılarının link ve
+   ürün verisi hedefi. Panelde ikisini ayırmak bu yüzden önemli. */
+function ownBrands(y){
+  const sec=y.match(/^\s*own_brands:\s*\n([\s\S]*?)(?=\n\s{2}\w|\n\w)/m);
+  if(!sec) return [];
+  // Başa \n ekleniyor: ilk kayıt da diğerleri gibi ayraçla başlasın, yoksa
+  // slice(1) listenin ilk markasını sessizce düşürüyor.
+  return ("\n"+sec[1]).split(/\n\s{4}- /).slice(1).map(block=>{
+    const url=(block.match(/url:\s*https?:\/\/([^\/\s]+)/)||[])[1]||"";
+    const m=block.match(/match:\s*\[([\s\S]*?)\]/);
+    const match=m?m[1].split(",").map(s=>s.trim().replace(/\s+/g," ")).filter(Boolean):[];
+    return {host:url, key:url.split(".")[0], match};
+  }).filter(b=>b.host);
+}
+
+/* facts.yaml içindeki her markanın kaç verisi doğrulanmış. Fact base doluluğu
+   içerik kalitesinin asıl belirleyicisi olduğu için panelde görünmeli. */
+function factStatus(text){
+  const out={};
+  if(!text) return out;
+  const sec=text.match(/^own_products:\s*\n([\s\S]*?)(?=\n[a-z_]+:)/m);
+  if(!sec) return out;
+  const parts=sec[1].split(/\n\s{2}(?=\w)/);
+  for(const p of parts){
+    const key=(p.match(/^\s*(\w+):/)||[])[1]; if(!key) continue;
+    out[key]={ok:(p.match(/verified:\s*true/g)||[]).length,
+              wait:(p.match(/verified:\s*false/g)||[]).length};
+  }
+  return out;
 }
 
 /* ===================== oturum ===================== */
@@ -416,15 +451,18 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li]=await Promise.all([
+    const [td,pub,li,fx]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
-      ghJson(`data/${d}/link-index.json`)]);
+      ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
-      published:pub||[],links:(li||[]).length});
+      published:pub||[],links:(li||[]).length,facts:factStatus(fx)});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
   S.runs=((await gh("/actions/runs?per_page=15"))||{}).workflow_runs||[];
+  // Tek site varken seçici gizlenir, domain marka başlığının altına yazılır.
+  $("sitePick").hidden = out.length < 2;
+  $("brandSub").textContent = out.length===1 ? out[0].domain : "Travelpedia";
   $("siteSel").innerHTML=out.map(s=>`<option ${s.domain===S.cur?"selected":""}>${esc(s.domain)}</option>`).join("");
   $("footStatus").textContent="Güncellendi "+new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
   render();
@@ -449,7 +487,7 @@ function render(){
     seo:["SEO skoru","Her yazının SEO, AEO ve GEO ölçümü"],
     qa:["Kalite kapısı","Yayınlanmadan reddedilen yazılar"],
     runs:["Çalışmalar","Otomasyonun geçmişi"],
-    sites:["Siteler","Bağlı sitelerin durumu"],
+    sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
   $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites})[VIEW]();
@@ -614,7 +652,7 @@ function vDash(){
 
   const tiles=`<div class="tiles">
     <div class="tile"><div class="lab">${ico('check')}Yayınlanan yazı</div>
-      <div class="num">${pubN}</div><div class="sub">${S.sites.length} sitede toplam</div></div>
+      <div class="num">${pubN}</div><div class="sub">${S.sites.length>1?`${S.sites.length} sitede toplam`:esc(s.domain)}</div></div>
     <div class="tile accent"><div class="lab">${ico('cal')}Takvimde planlı</div>
       <div class="num">${sched}</div><div class="sub">${all.filter(t=>t.status==="pending"&&!t.scheduled_for).length} konu kuyrukta bekliyor</div></div>
     <div class="tile ${rej?'badt':''}"><div class="lab">${ico('shield')}Kapıdan dönen</div>
@@ -815,19 +853,71 @@ function vRuns(){
     }).join("")}</tbody></table></div></div>`;
 }
 
+/* Bu ekran iki farklı şeyi bilerek ayırıyor:
+   — SİTE: içerik üretilen ve yayınlanan yer. Şu an tek: istambul.com.
+   — MARKA: o yazıların link verdiği kendi ürün siteleri. Bunlar sistemde
+     yönetilmiyor, blog çıkmıyor; sadece link hedefi ve ürün verisi kaynağı.
+   İkisi aynı tabloda listelenince "beş site yönetiyoruz" gibi duruyordu. */
 function vSites(){
-  return `<div class="panelbox" style="margin-top:0"><header><h2>Bağlı siteler</h2>
-    <span class="sp"></span><span class="hint">Yeni site: GitHub → Actions → "Yeni site ekle"</span></header>
+  const s=site(); if(!s) return empty("globe","Site yok","");
+  const multi=S.sites.length>1;
+
+  const siteRow=x=>`<tr>
+    <td><a href="https://${esc(x.domain)}" target="_blank" rel="noopener">${esc(x.domain)}</a></td>
+    <td><span class="pill ${x.mode==="live"?"brand":"amber"}"><span class="dot"></span>${x.mode==="live"?"canlı":"gölge"}</span></td>
+    <td style="color:var(--muted)">${x.perWeek}/hafta · ${esc(x.days.join(", "))}</td>
+    <td>${x.topics.filter(t=>t.scheduled_for&&t.status==="pending").length}</td>
+    <td>${x.topics.filter(t=>t.status==="pending"&&!t.scheduled_for).length}</td>
+    <td>${x.published.length}</td><td>${nf(x.links)}</td></tr>`;
+
+  const siteBox=`<div class="panelbox" style="margin-top:0">
+    <header><h2>${multi?"Yayın yapılan siteler":"Yayın yapılan site"}</h2><span class="sp"></span>
+      <span class="hint">${multi?S.sites.length+" site":"Şu an tek site"}</span></header>
     <div class="tw"><table><thead><tr><th>Site</th><th>Mod</th><th>Program</th>
-    <th>Takvimde</th><th>Kuyrukta</th><th>Yayınlanan</th><th>İç link hedefi</th></tr></thead><tbody>
-    ${S.sites.map(s=>`<tr>
-      <td><a href="https://${esc(s.domain)}" target="_blank" rel="noopener">${esc(s.domain)}</a></td>
-      <td><span class="pill ${s.mode==="live"?"brand":"amber"}"><span class="dot"></span>${s.mode==="live"?"canlı":"gölge"}</span></td>
-      <td style="color:var(--muted)">${s.perWeek}/hafta · ${esc(s.days.join(", "))}</td>
-      <td>${s.topics.filter(t=>t.scheduled_for&&t.status==="pending").length}</td>
-      <td>${s.topics.filter(t=>t.status==="pending"&&!t.scheduled_for).length}</td>
-      <td>${s.published.length}</td><td>${nf(s.links)}</td></tr>`).join("")}
-    </tbody></table></div></div>`;
+    <th>Takvimde</th><th>Kuyrukta</th><th>Yayınlanan</th><th>İç link hedefi</th></tr></thead>
+    <tbody>${S.sites.map(siteRow).join("")}</tbody></table></div>
+    <div style="padding:13px 17px;font-size:12.5px;color:var(--muted);line-height:1.6;
+      border-top:1px solid var(--line-2)">
+      Sosyal medya gönderileri henüz devrede değil: Instagram hesabı Business'a
+      çevrilip Facebook sayfasına bağlanınca bu satıra sosyal program da eklenecek.
+    </div></div>`;
+
+  const fs=s.facts||{};
+  const brandBox=s.brands&&s.brands.length?`<div class="panelbox">
+    <header><h2>Yazıların yönlendirdiği markalar</h2><span class="sp"></span>
+      <span class="hint">${s.brands.length} marka · bunlar ayrı birer site değil</span></header>
+    <div style="padding:13px 17px 3px;font-size:12.5px;color:var(--ink-2);line-height:1.6">
+      Bu adreslerde blog yayınlanmıyor. ${esc(s.domain)} yazıları konusuna göre
+      bunlardan birine tek bir ticari link veriyor, ve bu ürünlerin fiyat/süre
+      bilgisi fact base'den geliyor. Doğrulanmamış veri makalede rakam olarak
+      yazılamaz — bu yüzden fact base doluluğu doğrudan içerik kalitesi demek.
+    </div>
+    <div class="tw"><table><thead><tr><th>Marka</th><th>Hangi konularda</th>
+      <th>Fact base</th></tr></thead><tbody>
+    ${s.brands.map(b=>{
+      const f=fs[b.key]||{ok:0,wait:0};
+      const total=f.ok+f.wait;
+      const pill=!total?`<span class="pill red"><span class="dot"></span>boş</span>`
+        :f.ok===total?`<span class="pill brand"><span class="dot"></span>${f.ok} veri doğrulandı</span>`
+        :f.ok?`<span class="pill amber"><span class="dot"></span>${f.ok}/${total} doğrulandı</span>`
+        :`<span class="pill amber"><span class="dot"></span>${f.wait} veri onay bekliyor</span>`;
+      return `<tr>
+        <td><a href="https://${esc(b.host)}" target="_blank" rel="noopener">${esc(b.host)}</a></td>
+        <td style="color:var(--muted)">${esc(b.match.slice(0,4).join(", "))}${b.match.length>4?` +${b.match.length-4}`:""}</td>
+        <td>${pill}</td></tr>`;
+    }).join("")}
+    </tbody></table></div></div>`:"";
+
+  const addBox=`<div class="panelbox"><header><h2>Yeni site ekleme</h2></header>
+    <div style="padding:15px 17px;font-size:13.5px;color:var(--ink-2);line-height:1.65">
+      Sistem çok siteli kurgulandı ama şu an bilerek tek siteyle çalışıyor:
+      ${esc(s.domain)} oturana kadar ikinci siteyi eklemek sadece gürültü olur.
+      İkinci site GitHub → Actions → <code>Yeni site ekle</code> ile eklenir;
+      eklendiği anda sol üstte site seçici geri gelir ve bütün ekranlar
+      seçili siteye göre çalışır.
+    </div></div>`;
+
+  return siteBox + brandBox + addBox;
 }
 
 /* ===================== eylemler ===================== */
