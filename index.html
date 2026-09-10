@@ -117,6 +117,9 @@ main{min-width:0}
 .panelbox > header h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
 .panelbox > header .sp{flex:1}
 .panelbox > header .hint{font-size:12.5px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);line-height:1.55;padding:11px 17px;
+  background:var(--raised);border-bottom:1px solid var(--line-2)}
+.note b{color:var(--ink-2);font-weight:600}
 
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:11px 17px;border-bottom:1px solid var(--line-2);font-size:14px;
@@ -180,7 +183,12 @@ tbody tr:hover{background:var(--raised)}
 .kwrow .m{font-size:12.5px;color:var(--muted);margin-top:3px;display:flex;gap:10px;
   flex-wrap:wrap;align-items:center}
 .score{font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);min-width:34px;
-  text-align:right}
+  text-align:right;cursor:help}
+/* skor elle değiştirilmişse görünsün — otomatik sıralamaya güvenirken
+   hangi satıra müdahale edildiğini bilmek gerekiyor */
+.score .boost{display:block;font-size:10px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--amber);font-variant-numeric:normal}
+.kwrow .m .muted{opacity:.6;font-style:italic}
 .acts{display:flex;gap:6px;align-items:center}
 
 /* ---------- seo skoru ---------- */
@@ -455,6 +463,7 @@ async function load(){
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
+      volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx)});
   }
   S.sites=out;
@@ -772,14 +781,14 @@ function vKw(){
     return `<div class="kwrow">
       <div class="main"><div class="t">${esc(t.topic)}</div><div class="m">
         ${t.keyword?`<span>${esc(t.keyword)}</span>`:""}
-        ${t.volume?`<span>${nf(t.volume)}/ay</span>`:""}
-        ${t.difficulty?`<span>${esc({easy:"kolay",medium:"orta",hard:"zor"}[t.difficulty]||t.difficulty)}</span>`:""}
+        ${volLabel(t)}
+        ${compLabel(t)}
         ${t.own_brand?`<span class="pill brand">${esc(t.own_brand)}</span>`
           :t.affiliate?`<span class="pill">affiliate</span>`:""}
       </div></div>
       ${t.seo&&typeof t.seo.total==="number"?grBadge(t):""}
       ${st}
-      <div class="score" title="konu önceliği">${(t.score??0).toFixed(2)}</div>
+      <div class="score" title="${esc(scoreWhy(t))}">${(t.score??0).toFixed(2)}${t.score_boost?`<span class="boost">elle</span>`:""}</div>
       <div class="acts">
         ${t.status==="pending"?`<button class="btn sm" onclick="bump(${j},.05)">+</button>
         <button class="btn sm" onclick="bump(${j},-.05)">−</button>`:""}
@@ -796,12 +805,13 @@ function vKw(){
       <input id="kTopic" placeholder="Konu başlığı — örn. Bosphorus dinner cruise menu" style="flex:1;min-width:260px">
       <input id="kKey" placeholder="anahtar kelime" style="width:190px">
       <input id="kVol" type="number" placeholder="aylık hacim" style="width:130px">
-      <select id="kDiff"><option value="easy">kolay</option>
-        <option value="medium" selected>orta</option><option value="hard">zor</option></select>
+      <select id="kDiff" title="Reklamveren rekabeti"><option value="low">düşük rekabet</option>
+        <option value="medium" selected>orta rekabet</option><option value="high">yüksek rekabet</option></select>
       <button class="btn primary" onclick="addKw()">Ekle</button>
     </div>
     <header style="border-top:1px solid var(--line-2)"><h2>Kuyruk</h2>
       <span class="sp"></span><span class="hint">${rows.length} konu</span></header>
+    ${volSourceNote(s)}
     ${body}</div>`;
 }
 
@@ -991,27 +1001,73 @@ function matchBrand(s,text){
     if(s.brands.includes(d)&&ws.some(w=>l.includes(w))) return d;
   return null;
 }
+// Arama hacmi Google Ads'ten ARALIK olarak geliyor: aktif reklam harcaması
+// olmadan Google kesin sayı vermiyor. Aralığı olduğu gibi göstermek, orta
+// noktayı kesin sayı gibi sunmaktan dürüst.
+// Kaynağı ve sınırını satırların üstünde yazıyoruz. Aralıkları kesin sayı
+// sanıp bütçe kurmak yanlış olur; bu not onu engelliyor.
+function volSourceNote(s){
+  const v=s.volume_source; if(!v) return "";
+  return `<div class="note">Arama hacmi: ${esc(v.provider||"—")} · ` +
+    `${esc((v.markets||[]).join(", "))} · ${esc(v.period||"")} · ` +
+    `okundu ${esc(v.read_date||"")}<br>` +
+    `Aktif reklam harcaması olmadan Google kesin sayı değil <b>aralık</b> veriyor. ` +
+    `Sıralama için yeterli, mutlak trafik tahmini değil.</div>`;
+}
+function volLabel(t){
+  if(t.volume_range&&t.volume_range!=="veri yok")
+    return `<span title="Google Ads, 6 pazar, son 12 ay">${esc(t.volume_range)}/ay</span>`;
+  if(t.volume_range==="veri yok") return `<span class="muted">hacim verisi yok</span>`;
+  if(t.search_volume) return `<span>${nf(t.search_volume)}/ay</span>`;
+  if(t.volume) return `<span>${nf(t.volume)}/ay</span>`;
+  return "";
+}
+function compLabel(t){
+  const m={low:"düşük rekabet",medium:"orta rekabet",high:"yüksek rekabet",
+           easy:"kolay",hard:"zor"};
+  const v=t.competition||t.difficulty;
+  if(!v||v==="unknown") return "";
+  return `<span title="Reklamveren talebi — SEO zorluğu değil">${esc(m[v]||v)}</span>`;
+}
+function scoreWhy(t){
+  const p=t.score_parts;
+  if(!p) return "konu önceliği";
+  const L={search_volume:"hacim",commercial_intent:"ticari niyet",
+           own_product_match:"kendi ürünü",gap:"boşluk"};
+  const parts=Object.entries(L).map(([k,l])=>`${l} ${(p[k]??0).toFixed(2)}`).join(" · ");
+  return t.score_boost
+    ? `${parts}\notomatik ${(t.score_auto??0).toFixed(2)} + elle ${t.score_boost>0?"+":""}${t.score_boost.toFixed(2)}`
+    : parts;
+}
 async function addKw(){
   const s=site();
   const topic=$("kTopic").value.trim(); if(!topic) return toast("Konu başlığı gerekli");
   if(s.topics.some(t=>t.topic===topic)) return toast("Bu konu zaten kuyrukta");
   const keyword=$("kKey").value.trim();
   const volume=parseInt($("kVol").value||"0",10)||null;
-  const difficulty=$("kDiff").value;
+  const competition=$("kDiff").value;
   const brand=matchBrand(s,topic+" "+keyword);
+  // Buradaki skor geçici. Motor bir sonraki çalıştırmada yaml'daki
+  // ağırlıklara göre yeniden hesaplıyor; bu yalnızca satır boş görünmesin diye.
   let score=0.45+(brand?0.30:0)+(volume?Math.min(0.15,volume/10000):0)
-    +(difficulty==="easy"?0.05:difficulty==="hard"?-0.05:0);
+    +(competition==="high"?0.05:competition==="low"?-0.05:0);
   score=Math.max(0,Math.min(0.99,score));
-  s.topics.push({topic,keyword,volume,difficulty,own_brand:brand||null,
-    score:+score.toFixed(2),status:"pending",added_by:"panel",
-    added_at:new Date().toISOString().slice(0,10)});
+  s.topics.push({topic,keyword,search_volume:volume,competition,
+    own_brand:brand||null,score:+score.toFixed(2),status:"pending",
+    added_by:"panel",added_at:new Date().toISOString().slice(0,10)});
   await save(`anahtar kelime eklendi: ${topic}`);
   render(); toast(brand?`Eklendi — ${brand} ile eşleşti`:"Eklendi");
 }
 async function bump(topic,d){
+  // Skoru doğrudan yazmıyoruz: motor her çalıştırmada skoru yeniden
+  // hesaplıyor ve elle verilen değeri eziyordu. score_boost ayrı durup
+  // hesabın üstüne ekleniyor, yani müdahale kalıcı.
   const s=site(), t=s.topics.find(x=>x.topic===topic); if(!t)return;
-  t.score=+Math.max(0,Math.min(0.99,(t.score||0)+d)).toFixed(2);
-  await save(`skor: ${topic} → ${t.score}`); render();
+  t.score_auto=t.score_auto??t.score??0;
+  t.score_boost=+Math.max(-.5,Math.min(.5,(t.score_boost||0)+d)).toFixed(2);
+  if(!t.score_boost) delete t.score_boost;
+  t.score=+Math.max(0,Math.min(1,t.score_auto+(t.score_boost||0))).toFixed(3);
+  await save(`öncelik: ${topic} → ${t.score}`); render();
 }
 async function drop(topic){
   const s=site(); s.doc.topics=s.topics=s.topics.filter(x=>x.topic!==topic);
