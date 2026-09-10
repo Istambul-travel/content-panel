@@ -109,6 +109,9 @@ main{min-width:0}
 .tile.accent .num{color:var(--brand-ink)}
 .tile.warnt .num{color:var(--amber)}
 .tile.badt .num{color:var(--red)}
+.tile.warnt .num{color:var(--amber)}
+.tile .num .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:5px;
+  letter-spacing:0}
 
 .panelbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--shadow);overflow:hidden;margin-top:22px}
@@ -190,6 +193,19 @@ tbody tr:hover{background:var(--raised)}
   color:var(--amber);font-variant-numeric:normal}
 .kwrow .m .muted{opacity:.6;font-style:italic}
 .acts{display:flex;gap:6px;align-items:center}
+
+/* ---------- aday kelimeler ---------- */
+.fuel{display:flex;gap:20px;align-items:center;padding:18px 17px}
+.fuel .big{font-size:44px;font-weight:600;letter-spacing:-.03em;line-height:1;
+  color:var(--brand);display:flex;align-items:baseline;gap:6px}
+.fuel .big span{font-size:14px;font-weight:500;color:var(--muted);letter-spacing:0}
+.fuel .txt{font-size:13px;color:var(--ink-2);line-height:1.6}
+.fuel.amber .big{color:var(--amber)}
+.fuel.red .big{color:var(--red)}
+.seedbox{display:flex;gap:14px;align-items:flex-start;padding:15px 17px}
+.seedlist{flex:1;display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:4px 10px;border-radius:999px;background:var(--raised);
+  border:1px solid var(--line);color:var(--ink-2)}
 
 /* ---------- seo skoru ---------- */
 .gr{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
@@ -306,6 +322,7 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="dash" data-ico="grid" onclick="go('dash')"><span>Özet</span></button>
       <button data-v="cal" data-ico="cal" onclick="go('cal')"><span>Takvim</span><span class="count" id="cCal">0</span></button>
       <button data-v="kw" data-ico="key" onclick="go('kw')"><span>Anahtar kelimeler</span><span class="count" id="cKw">0</span></button>
+      <button data-v="cand" data-ico="seed" onclick="go('cand')"><span>Aday kelimeler</span><span class="count" id="cCand">0</span></button>
       <div class="lbl">Denetim</div>
       <button data-v="seo" data-ico="gauge" onclick="go('seo')"><span>SEO skoru</span><span class="count" id="cSeo">0</span></button>
       <button data-v="qa" data-ico="shield" onclick="go('qa')"><span>Kalite kapısı</span><span class="count" id="cQa">0</span></button>
@@ -368,6 +385,7 @@ function ico(name){
     alert:'<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
     inbox:'<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5z"/>',
     gauge:'<path d="M4 18a8 8 0 1116 0"/><path d="M12 18l4.5-5"/><circle cx="12" cy="18" r="1.4"/>',
+    seed:'<path d="M12 21c-5 0-8-3-8-8 5 0 8 3 8 8z"/><path d="M12 21c5 0 8-3 8-8-5 0-8 3-8 8z"/><path d="M12 21V9"/>',
     money:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.8-1.5-3-1.5-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2c-1.2 0-2.4-.5-3-1.5M12 6.5v11"/>',
   }[name]||"";
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
@@ -459,12 +477,14 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx]=await Promise.all([
+    const [td,pub,li,fx,cd]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
-      ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`)]);
+      ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
+      ghJson(`data/${d}/candidates.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
-      published:pub||[],links:(li||[]).length,facts:factStatus(fx)});
+      published:pub||[],links:(li||[]).length,facts:factStatus(fx),
+      cand:cd||{seeds:[],harvested:[]}});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -487,19 +507,21 @@ function render(){
     $("cCal").textContent=s.topics.filter(t=>t.scheduled_for&&t.status==="pending").length;
     $("cKw").textContent=s.topics.filter(t=>t.status==="pending").length;
     $("cQa").textContent=s.topics.filter(t=>t.status==="rejected").length;
+    $("cCand").textContent=(s.cand.harvested||[]).filter(h=>h.status==="new"||h.status==="approved").length;
     $("cSeo").textContent=scored(s).length;
   }
   const meta={
     dash:["Özet","Sistemin bugünkü durumu"],
     cal:["Takvim","Hangi yazı hangi gün çıkacak"],
     kw:["Anahtar kelimeler","Konu kuyruğu ve öncelikler"],
+    cand:["Aday kelimeler","Konu bankasının yakıtı ve bekleyen adaylar"],
     seo:["SEO skoru","Her yazının SEO, AEO ve GEO ölçümü"],
     qa:["Kalite kapısı","Yayınlanmadan reddedilen yazılar"],
     runs:["Çalışmalar","Otomasyonun geçmişi"],
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites})[VIEW]();
 }
 
 /* ===================== görünümler ===================== */
@@ -664,6 +686,14 @@ function vDash(){
       <div class="num">${pubN}</div><div class="sub">${S.sites.length>1?`${S.sites.length} sitede toplam`:esc(s.domain)}</div></div>
     <div class="tile accent"><div class="lab">${ico('cal')}Takvimde planlı</div>
       <div class="num">${sched}</div><div class="sub">${all.filter(t=>t.status==="pending"&&!t.scheduled_for).length} konu kuyrukta bekliyor</div></div>
+    ${(()=>{const r=(s.cand||{}).runway;
+      if(!r) return "";
+      // Yakıt özet ekranında duruyor çünkü konu bankasının bitmesi sessiz bir
+      // arıza: sistem hata vermiyor, sadece gün atlamaya başlıyor.
+      const cls=r.level==="critical"?"badt":r.level==="warn"?"warnt":"";
+      return `<div class="tile ${cls}"><div class="lab">${ico('seed')}Konu bankası</div>
+        <div class="num">${esc(String(r.weeks))}<span class="unit">hafta</span></div>
+        <div class="sub">${r.level==="ok"?"yeterli":"yenileme turu gerekiyor"}</div></div>`;})()}
     <div class="tile ${rej?'badt':''}"><div class="lab">${ico('shield')}Kapıdan dönen</div>
       <div class="num">${rej}</div><div class="sub">${rej?"gerekçeleri Kalite kapısında":"kural ihlali yok"}</div></div>
     ${(()=>{const sc=S.sites.flatMap(scored);
@@ -813,6 +843,87 @@ function vKw(){
       <span class="sp"></span><span class="hint">${rows.length} konu</span></header>
     ${volSourceNote(s)}
     ${body}</div>`;
+}
+
+/* ===================== aday kelimeler ===================== */
+// Konu bankası sonlu. Haftada 3-5 yazı çıkarken bir gün biter ve motor gün
+// atlamaya başlar — sessizce, kimse fark etmeden. Bu ekranın tek amacı o günü
+// gelmeden önce göstermek.
+function vCand(){
+  const s=site(); if(!s) return empty("globe","Site yok","");
+  const c=s.cand||{seeds:[],harvested:[]};
+  const r=c.runway||{};
+  const seeds=(c.seeds||[]).map(x=>x.seed);
+  const waiting=(c.harvested||[]).filter(h=>h.status==="new"||h.status==="approved");
+  const done=(c.harvested||[]).filter(h=>h.status==="promoted"||h.status==="rejected");
+
+  const lvl=r.level==="critical"?"red":r.level==="warn"?"amber":"";
+  const fuel=`<div class="fuel ${lvl}">
+    <div class="big">${r.weeks!=null?esc(String(r.weeks)):"—"}<span>hafta</span></div>
+    <div class="txt"><b>${esc(r.message||"Yakıt hesaplanmadı")}</b><br>
+      Kuyrukta ${r.eligible??0} konu var, haftada ${r.per_week??"?"} yazı çıkıyor.
+      ${r.level==="ok"?"":"Aşağıdaki tohumları Keyword Planner'a yapıştırıp yeni tur açmanın vakti."}</div></div>`;
+
+  const seedBox=seeds.length?`<div class="seedbox">
+      <div class="seedlist">${seeds.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>
+      <button class="btn primary" onclick="copySeeds()">Listeyi kopyala</button>
+    </div>
+    <div class="note">Bu ${seeds.length} kelimeyi Google Ads &rsaquo; Anahtar Kelime Planlayıcı &rsaquo;
+      <b>“Yeni anahtar kelimeler keşfedin”</b> kutusuna yapıştır. Konumu
+      ABD, İngiltere, Almanya, Fransa, İspanya, İtalya olarak ayarla —
+      Türkiye bırakılırsa sonuçlar yanıltıcı çıkıyor. Google yüzlerce ilgili
+      kelimeyi hacimleriyle döndürecek; sonuç havuza yazılınca aşağıdaki
+      liste dolar.</div>`
+    : `<div class="note">Tohum listesi henüz üretilmedi. Haftalık çalışma bunu kendisi hazırlıyor.</div>`;
+
+  const rows=waiting.length? waiting.sort((a,b)=>(b.search_volume||0)-(a.search_volume||0))
+    .map(h=>{
+      const j=JSON.stringify(h.keyword).replace(/"/g,"&quot;");
+      return `<div class="kwrow">
+        <div class="main"><div class="t">${esc(h.keyword)}</div><div class="m">
+          ${h.volume_range?`<span>${esc(h.volume_range)}/ay</span>`:`<span class="muted">hacim yok</span>`}
+          ${compLabel(h)}
+          <span>bulundu ${esc(h.found_at||"")}</span>
+        </div></div>
+        ${h.status==="approved"?`<span class="pill blue"><span class="dot"></span>onaylandı</span>`
+          :`<span class="pill">bekliyor</span>`}
+        <div class="acts">
+          ${h.status!=="approved"?`<button class="btn sm" onclick="candOk(${j})">Onayla</button>`:""}
+          <button class="btn sm" onclick="candNo(${j})">Reddet</button>
+        </div></div>`;
+    }).join("")
+    : empty("inbox","Havuz boş",
+        "Keyword Planner turundan dönen kelimeler burada birikir. Mevcut konularla çakışanlar otomatik eleniyor.");
+
+  return `<div class="panelbox" style="margin-top:0">
+    <header><h2>Konu bankası yakıtı</h2></header>
+    ${fuel}</div>
+  <div class="panelbox">
+    <header><h2>Tohum kelimeler</h2><span class="sp"></span>
+      <span class="hint">${seeds.length} tohum${c.seeds_built_at?` · ${esc(c.seeds_built_at)}`:""}</span></header>
+    ${seedBox}</div>
+  <div class="panelbox">
+    <header><h2>Bekleyen adaylar</h2><span class="sp"></span>
+      <span class="hint">${waiting.length} kelime${done.length?` · ${done.length} işlenmiş`:""}</span></header>
+    <div class="note">Onayladıkların hacim eşiğine bakılmadan konuya çevrilir.
+      Dokunmadıklarından hacmi yeterli olanlar zaten kendiliğinden geçiyor —
+      onay bir hızlandırıcı, zorunluluk değil.</div>
+    ${rows}</div>`;
+}
+
+function copySeeds(){
+  const c=site().cand||{}; const t=(c.seeds||[]).map(x=>x.seed).join(", ");
+  navigator.clipboard.writeText(t).then(()=>toast("Tohum listesi kopyalandı"),
+    ()=>toast("Kopyalanamadı — listeyi elle seç"));
+}
+async function candOk(kw){ await candSet(kw,"approved","aday onaylandı"); }
+async function candNo(kw){ await candSet(kw,"rejected","aday reddedildi"); }
+async function candSet(kw,status,msg){
+  const s=site(), h=(s.cand.harvested||[]).find(x=>x.keyword===kw); if(!h) return;
+  h.status=status; h.decided_at=new Date().toISOString().slice(0,10);
+  try{ await put(`data/${s.domain}/candidates.json`,s.cand,`${msg}: ${kw}`); }
+  catch(e){ return toast("Kaydedilemedi: "+e.message); }
+  render(); toast(status==="approved"?"Onaylandı — bir sonraki turda konuya çevrilecek":"Reddedildi");
 }
 
 function vQa(){
