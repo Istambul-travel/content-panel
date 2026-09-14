@@ -361,6 +361,8 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="qa" data-ico="shield" onclick="go('qa')"><span>Kalite kapısı</span><span class="count" id="cQa">0</span></button>
       <button data-v="runs" data-ico="play" onclick="go('runs')"><span>Çalışmalar</span></button>
       <button data-v="sites" data-ico="globe" onclick="go('sites')"><span>Site ve markalar</span></button>
+      <button data-v="cost" data-ico="coin" onclick="go('cost')"><span>Maliyet</span></button>
+      <button data-v="std" data-ico="book" onclick="go('std')"><span>Standartlar</span></button>
     </nav>
     <div class="asidefoot">
       <div id="footStatus">—</div>
@@ -412,6 +414,8 @@ function ico(name){
     play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/>',
     globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/>',
     refresh:'<path d="M20 11a8 8 0 10-2.3 6M20 5v6h-6"/>',
+    coin:'<ellipse cx="12" cy="6.5" rx="8" ry="3.5"/><path d="M4 6.5v11c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5v-11"/><path d="M4 12c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5"/>',
+    book:'<path d="M4 4.5A2.5 2.5 0 016.5 2H20v18H6.5A2.5 2.5 0 004 22z"/><path d="M8 7h8M8 11h6"/>',
     link:'<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>',
     check:'<path d="M20 6L9 17l-5-5"/>',
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -512,15 +516,17 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
-      ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`)]);
+      ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
+      ghJson(`data/${d}/cost.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
-      cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]}});
+      cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
+      cost:ct||{runs:[]}});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -558,9 +564,11 @@ function render(){
     sc:["Analitik","Google aramada gerçekte ne oluyor"],
     soc:["Sosyal medya","Haftanın gönderileri ve elle müdahale"],
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
+    cost:["Maliyet","Her turun gerçek para karşılığı"],
+    std:["Standartlar","Motorun uyduğu kurallar — verilen kararların tam listesi"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,cost:vCost,std:vStd})[VIEW]();
 }
 
 /* ===================== analitik (Search Console) =====================
@@ -1194,6 +1202,111 @@ function vRuns(){
    — MARKA: o yazıların link verdiği kendi ürün siteleri. Bunlar sistemde
      yönetilmiyor, blog çıkmıyor; sadece link hedefi ve ürün verisi kaynağı.
    İkisi aynı tabloda listelenince "beş site yönetiyoruz" gibi duruyordu. */
+function vCost(){
+  const s=site(); if(!s) return "";
+  const runs=((s.cost&&s.cost.runs)||[]).slice().reverse();
+  if(!runs.length) return `<div class="empty">Henüz maliyet kaydı yok. İlk turdan sonra burada
+    her çalışmanın kaç para tuttuğu görünecek.</div>`;
+
+  const usd=v=>"$"+(v||0).toFixed(4);
+  const ay=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  const sonAy=runs.filter(r=>(r.at||"")>=ay);
+  const topla=(a,f)=>a.reduce((x,r)=>x+(f(r)||0),0);
+
+  const bloglar=sonAy.filter(r=>r.kind==="blog");
+  const yayin=bloglar.filter(r=>r.result==="published");
+  const bosa=bloglar.filter(r=>r.result!=="published");
+  const sosyal=sonAy.filter(r=>r.kind==="sosyal");
+
+  const toplam=topla(sonAy,r=>r.total_usd);
+  const bosaPara=topla(bosa,r=>r.total_usd);
+  const blogOrt=yayin.length?topla(yayin,r=>r.total_usd)/yayin.length:0;
+  const sosyalPara=topla(sosyal,r=>r.total_usd);
+  const sosyalAdet=topla(sosyal,r=>r.image_count)||sosyal.length;
+  // Haftada 3 yazı + 5 gönderi programına göre aylık projeksiyon.
+  const projeksiyon=blogOrt*13 + (sosyalAdet?sosyalPara/sosyalAdet:0)*21.7;
+
+  const tiles=`<div class="tiles">
+    <div class="tile"><div class="lab">${ico("coin")}Son 30 gün</div>
+      <div class="num">${usd(toplam)}</div>
+      <div class="sub">${sonAy.length} çalışma</div></div>
+    <div class="tile"><div class="lab">${ico("check")}Yayınlanan yazı başına</div>
+      <div class="num">${usd(blogOrt)}</div>
+      <div class="sub">${yayin.length} yazı</div></div>
+    <div class="tile"><div class="lab">${ico("share")}Sosyal gönderi başına</div>
+      <div class="num">${usd(sosyalAdet?sosyalPara/sosyalAdet:0)}</div>
+      <div class="sub">${sosyalAdet} gönderi</div></div>
+    <div class="tile ${bosaPara>toplam*0.4?"badt":bosaPara>toplam*0.2?"warnt":""}">
+      <div class="lab">${ico("alert")}Boşa giden</div>
+      <div class="num">${usd(bosaPara)}</div>
+      <div class="sub">${bosa.length} reddedilen taslak</div></div>
+  </div>`;
+
+  const not=`<div class="note">Aylık projeksiyon <strong>${usd(projeksiyon)}</strong>
+    — haftada 3 yazı ve 5 sosyal gönderi programına göre. Kalite kapısından dönen
+    taslak da faturalanıyor: yazılmış metnin parası geri gelmiyor, o yüzden
+    "boşa giden" ayrı gösteriliyor. Meta yayını, GitHub Pages ve WordPress
+    yazma ücretsiz.</div>`;
+
+  const satir=r=>`<tr>
+    <td>${esc((r.at||"").replace("T"," ").slice(0,16))}</td>
+    <td>${esc(r.kind||"")}</td>
+    <td class="muted">${esc(r.subject||"")}</td>
+    <td>${esc(r.result||"")}</td>
+    <td class="num">${nf(r.input||0)} / ${nf(r.output||0)}</td>
+    <td class="num">${usd(r.text_usd)}</td>
+    <td class="num">${r.image_usd?usd(r.image_usd):"—"}</td>
+    <td class="num"><strong>${usd(r.total_usd)}</strong></td></tr>`;
+
+  return tiles+not+`<div class="panelbox">
+    <header><h2>Çalışmalar</h2><span class="sp"></span>
+      <span class="hint">son ${Math.min(runs.length,60)} kayıt</span></header>
+    <div class="tw"><table><thead><tr>
+    <th>Tarih</th><th>Tür</th><th>Konu</th><th>Sonuç</th>
+    <th>Token giriş/çıkış</th><th>Metin</th><th>Görsel</th><th>Toplam</th>
+    </tr></thead><tbody>${runs.slice(0,60).map(satir).join("")}</tbody></table></div></div>`;
+}
+
+function vStd(){
+  const b=(baslik,maddeler)=>`<div class="panelbox">
+    <header><h2>${baslik}</h2></header>
+    <ul style="margin:0;padding:14px 17px 16px 34px;font-size:13px;
+      line-height:1.65;color:var(--ink)">`+
+    maddeler.map(m=>`<li style="margin-bottom:7px">${m}</li>`).join("")+
+    `</ul></div>`;
+  return `<div class="note">Bu ekran motorun uyduğu kuralların tam listesi.
+    Kurallar kodda yaşıyor; burası ne karar verildiğini ve <em>neden</em>
+    verildiğini gösteriyor.</div>` +
+  b("Blog görselleri",[
+    "Öne çıkan görsel üç kademeli: WordPress kütüphanesindeki gerçek fotoğraf → AI fotoğraf → markalı başlık kartı.",
+    "<strong>Gövdede üretilmiş grafik YOK.</strong> Fiyat ve süre tablosu artık gerçek HTML tablo — tablonun resmini Google okuyamıyor, o veri sayfanın en alıntılanabilir kısmı.",
+    "Her tablo yalnızca <code>facts.yaml</code>'da <code>verified: true</code> olan veriden çiziliyor.",
+    "Tanınmış yapının AI portresi istenmiyor: minare sayısı, kubbe düzeni hep hafif yanlış çıkıyor. Onun yerine atmosfer isteniyor."]) +
+  b("Instagram ve Facebook görseli",[
+    "<strong>Fotoğrafsız gönderi çıkmaz.</strong> Gerçek fotoğraf → AI fotoğraf → gönderiyi atla. Kart yok.",
+    "Düzen hesabın kendi gönderilerinden alındı: tam sayfa fotoğraf, başlık üstte sıkışık büyük harf, italik serif alt satır, sol altta krem bilgi kartı, altta marka kilidi.",
+    "Tipografiyi motor çiziyor, model değil: görsel modelleri harfleri bozuk yazıyor (\"ISTAMBUL\" yerine \"ISTMABUL\").",
+    "Marka rengi ve alan adı konudan seçiliyor: Boğaz mavi/bosporuscruise.com, Haliç turkuaz/goldenhorncruise.com, hamam altın/istanbulhamam.com, Çamlıca kırmızı/camlicatower.com, sarnıç kahve/cisternoftheodosius.com."]) +
+  b("Sosyal metin — dört parça",[
+    "<strong>Kanca:</strong> tek satır, 125 karakterin altında. Facebook 80 karakterden sonra kesiyor, Instagram gerisini saklıyor.",
+    "<strong>Gövde:</strong> 1-2 kısa cümle, 150-300 karakter.",
+    "<strong>Alan adı:</strong> konunun kendi sitesi, tek başına kendi satırında. Instagram'da link tıklanamıyor; düz yazı tek yol.",
+    "<strong>Etiketler:</strong> 3-5 adet, her biri 24 karakterin altında, yeri/aktiviteyi adlandıran. #travel #love yasak.",
+    "Rakam, fiyat, saat uydurulmaz. En fazla bir emoji."]) +
+  b("Konu ve kalite kapısı",[
+    "Konu seçimi trafik × ticari değer; panelden bir güne atanan konu eşiğe bakılmadan çıkar.",
+    "Kapı reddederse konu \"rejected\" işaretlenir ve sıradaki konuya geçilir.",
+    "Benzerlik ölçümü kelime dizisi üzerinde <code>ratio()</code> — <code>quick_ratio()</code> yalnızca harf dağılımına baktığı için aynı dildeki her iki metni ~%90 benzer gösteriyordu.",
+    "Minimum 3 iç link ve 1 lokasyon linki; SEO eşiği 75."]) +
+  b("Yayın ve tekrar",[
+    "Blog: Pzt/Çrş/Cum, haftada 3 yazı. Sosyal: pazartesi, haftada 5 (2 makale + 2 lokasyon + 1 mevsimlik).",
+    "Instagram ve Facebook ayrı değerlendiriliyor: Facebook hatası Instagram kaydını geçersiz kılmıyor.",
+    "Tekrar filtresi yalnızca <strong>gerçekten yayınlanan</strong> konuları sayıyor; hata alan konu yeniden denenir.",
+    "İstanbul dışı lokasyon yayınlanmaz (<code>allow_outside_istanbul: false</code>)."]) +
+  b("Dokunulmayacaklar",[
+    "<strong>Kalıcı bağlantı yapısı.</strong> <code>/blog/</code> öneki iki kez denendi, iki kez geri alındı: 199 lokasyon sayfasını <code>/blog/location/...</code> adresine taşıyıp 404 yapıyor. Site <code>/%postname%/</code> kalıyor."]);
+}
+
 function vSites(){
   const s=site(); if(!s) return empty("globe","Site yok","");
   const multi=S.sites.length>1;
