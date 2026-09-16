@@ -1593,7 +1593,9 @@ function fixKart(p,i,duz){
       +'<button class="btn sm" onclick="fixRed('+i+')">Reddet</button>'
     : '<span class="sub">Yay&#305;nlanm&#305;&#351; g&#246;nderi. Buradaki metin kay&#305;tt&#305;r; Instagram&#39;daki g&#246;nderiyi de&#287;i&#351;tirmez.</span>';
   return '<div class="card" style="margin-bottom:12px"><header><b>'+esc(p.subject||"—")+'</b>'
-    +'<span class="count">'+esc(p.status||"")+'</span></header>'
+    +'<span class="count" style="margin-left:8px">'+esc(p.status||"")+'</span>'
+    +((p.image_urls&&p.image_urls.length>1)?'<span class="count" style="margin-left:6px">carousel '+p.image_urls.length+' kare</span>':'')
+    +'</header>'
     +'<div style="padding:10px 12px">'+img
     +'<textarea id="fx'+i+'" style="width:100%;min-height:190px;font:13px/1.55 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px"'
     +(duz?'':' readonly')+'>'+esc(p.caption||"")+'</textarea>'
@@ -1607,7 +1609,13 @@ function vFix(){
   var son=posts.filter(function(p){return p.status!=="ready";}).slice(-6).reverse();
   var yardim='<div class="card" style="margin-bottom:14px"><div style="padding:12px">'
     +'<b>Onay kuyru&#287;u nas&#305;l &#231;al&#305;&#351;&#305;yor</b>'
-    +'<p class="sub" style="margin:6px 0 0">Sitenin YAML&#39;&#305;nda <code>social.approval: true</code> ise g&#246;nderi &#252;retiliyor ama yay&#305;nlanm&#305;yor; burada <b>ready</b> olarak bekliyor. Metnini de&#287;i&#351;tirebilir, onaylayabilir ya da reddedebilirsin. Onaylad&#305;klar&#305;n ilk sosyal turda yay&#305;na &#231;&#305;k&#305;yor.<br><b>approval</b> kapal&#305;ysa g&#246;nderi &#252;retildi&#287;i anda &#231;&#305;k&#305;yor ve burada yaln&#305;zca ge&#231;mi&#351;i g&#246;r&#252;rs&#252;n.</p></div></div>';
+    +'<p class="sub" style="margin:6px 0 0">Sitenin YAML&#39;&#305;nda <code>social.approval: true</code> ise g&#246;nderi &#252;retiliyor ama yay&#305;nlanm&#305;yor; burada <b>ready</b> olarak bekliyor. Metnini de&#287;i&#351;tirebilir, onaylayabilir ya da reddedebilirsin. Onaylad&#305;klar&#305;n ilk sosyal turda yay&#305;na &#231;&#305;k&#305;yor.<br><b>approval</b> kapal&#305;ysa g&#246;nderi &#252;retildi&#287;i anda &#231;&#305;k&#305;yor ve burada yaln&#305;zca ge&#231;mi&#351;i g&#246;r&#252;rs&#252;n.</p>'
+    +'<div id="onayDurum" class="sub" style="margin:10px 0 0">&hellip;</div>'
+    +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn sm" id="onayBtn" onclick="onayCevir()">Onay modu</button>'
+    +'<button class="btn sm" onclick="onayYayinla()">Onaylananlar&#305; &#351;imdi yay&#305;nla</button>'
+    +'</div></div></div>';
+  setTimeout(onayOku, 0);
   var a = bekleyen.length
     ? '<h3 style="margin:16px 0 10px">Onay bekleyen ('+bekleyen.length+')</h3>'
       + bekleyen.map(function(p){return fixKart(p, posts.indexOf(p), true);}).join("")
@@ -1631,6 +1639,46 @@ function fixOnay(i){ var v=$("fx"+i).value;
   return fixYaz(i, function(p){p.caption=v; p.status="approved"; p.edited_by="panel";}, "gonderi onaylandi"); }
 function fixRed(i){
   return fixYaz(i, function(p){p.status="skipped"; p.skip_reason="panelden reddedildi";}, "gonderi reddedildi"); }
+
+
+async function onayOku(){
+  try{
+    var yol = "sites/" + S.cur + ".yaml";
+    var t = await ghFile(yol);
+    if(t === null) return;
+    var m = t.match(/\n  approval:\s*(true|false)/);
+    var acik = !!(m && m[1] === "true");
+    var e = $("onayDurum");
+    if(e) e.innerHTML = acik
+      ? "<b style='color:var(--brand)'>Onay modu A&Ccedil;IK</b> &mdash; g&ouml;nderiler &ouml;nce burada bekliyor, onaylamadan yay&#305;na &ccedil;&#305;km&#305;yor."
+      : "<b>Onay modu KAPALI</b> &mdash; g&ouml;nderiler &uuml;retildi&#287;i anda yay&#305;na &ccedil;&#305;k&#305;yor. Burada yaln&#305;zca ge&ccedil;mi&#351;i g&ouml;r&uuml;rs&uuml;n.";
+    var b = $("onayBtn");
+    if(b) b.textContent = acik ? "Onay modunu kapat" : "Onay modunu ac";
+  }catch(err){}
+}
+
+async function onayCevir(){
+  try{
+    var yol = "sites/" + S.cur + ".yaml";
+    var t = await ghFile(yol);
+    var m = t.match(/\n(  approval:\s*)(true|false)/);
+    if(!m){ toast("YAML icinde approval anahtari yok"); return; }
+    var yeni = m[2] === "true" ? "false" : "true";
+    t = t.replace(/\n(  approval:\s*)(true|false)/, "\n$1" + yeni);
+    await putRaw(yol, t, "panel: social.approval = " + yeni);
+    toast(yeni === "true" ? "Onay modu acildi" : "Onay modu kapatildi");
+    onayOku();
+  }catch(err){ toast("Degistirilemedi: " + err.message); }
+}
+
+async function onayYayinla(){
+  try{
+    await gh("/actions/workflows/social.yml/dispatches",
+      {method:"POST", body:JSON.stringify({ref:"main",
+        inputs:{site:S.cur, publish_approved:true}})});
+    toast("Onaylananlar yayina aliniyor");
+  }catch(err){ toast("Baslatilamadi: " + err.message); }
+}
 
 /* ---------- Site ekle ---------- */
 function vAdd(){
