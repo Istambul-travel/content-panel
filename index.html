@@ -363,6 +363,9 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="sites" data-ico="globe" onclick="go('sites')"><span>Site ve markalar</span></button>
       <button data-v="cost" data-ico="coin" onclick="go('cost')"><span>Maliyet</span></button>
       <button data-v="std" data-ico="book" onclick="go('std')"><span>Standartlar</span></button>
+      <div class="lbl">KURULUM</div>
+      <button data-v="fix" data-ico="check" onclick="go('fix')"><span>Onay ve düzelt</span><span class="count" id="cFix">0</span></button>
+      <button data-v="add" data-ico="globe" onclick="go('add')"><span>Site ekle</span></button>
     </nav>
     <div class="asidefoot">
       <div id="footStatus">—</div>
@@ -552,6 +555,7 @@ function render(){
     $("cCand").textContent=(s.cand.harvested||[]).filter(h=>h.status==="new"||h.status==="approved").length;
     $("cSeo").textContent=scored(s).length;
     $("cSoc").textContent=(s.soc.posts||[]).filter(p=>p.status==="ready").length;
+    $("cFix").textContent=(s.soc.posts||[]).filter(p=>p.status==="ready").length;
   }
   const meta={
     dash:["Özet","Sistemin bugünkü durumu"],
@@ -566,9 +570,11 @@ function render(){
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
     cost:["Maliyet","Her turun gerçek para karşılığı"],
     std:["Standartlar","Motorun uyduğu kurallar — verilen kararların tam listesi"],
+    fix:["Onay ve düzelt","Yayına çıkmadan önce gönderiyi oku, metnini değiştir, onayla ya da reddet"],
+    add:["Site ekle","Yeni bir siteyi sisteme tanıt"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,cost:vCost,std:vStd})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,cost:vCost,std:vStd,fix:vFix,add:vAdd})[VIEW]();
 }
 
 /* ===================== analitik (Search Console) =====================
@@ -1563,6 +1569,215 @@ function closeModal(){$("modalHost").innerHTML="";}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
 
 /* ===================== açılış ===================== */
+
+/* ===================== ONAY / DÜZELT ve SİTE EKLE =====================
+   16.09.2026'da eklendi. Panelin üç eksiği vardı: site ekleme formu yok,
+   onay kuyruğu yok, elle düzeltme yok. Bu iki ekran üçünü de kapatıyor.
+   Mevcut ekranlara DOKUNULMADI: iki yeni görünüm, kendi yazma yolları.
+   put() JSON yazıyor; YAML için putRaw eklendi. */
+
+async function putRaw(p, text, msg){
+  var body={message:msg, content:b64enc(text), branch:"main"};
+  if(S.sha[p]) body.sha=S.sha[p];
+  var r=await gh("/contents/"+p, {method:"PUT", body:JSON.stringify(body)});
+  if(r&&r.content) S.sha[p]=r.content.sha;
+  return r;
+}
+
+/* ---------- Onay ve düzelt ---------- */
+function fixKart(p,i,duz){
+  var img = p.image_url ? '<img src="'+esc(p.image_url)+'" style="max-width:220px;border-radius:8px;float:right;margin:0 0 10px 12px">' : '';
+  var btn = duz
+    ? '<button class="btn sm" onclick="fixKaydet('+i+')">Metni kaydet</button>'
+      +'<button class="btn sm" onclick="fixOnay('+i+')">Onayla &rarr; yay&#305;na</button>'
+      +'<button class="btn sm" onclick="fixRed('+i+')">Reddet</button>'
+    : '<span class="sub">Yay&#305;nlanm&#305;&#351; g&#246;nderi. Buradaki metin kay&#305;tt&#305;r; Instagram&#39;daki g&#246;nderiyi de&#287;i&#351;tirmez.</span>';
+  return '<div class="card" style="margin-bottom:12px"><header><b>'+esc(p.subject||"—")+'</b>'
+    +'<span class="count">'+esc(p.status||"")+'</span></header>'
+    +'<div style="padding:10px 12px">'+img
+    +'<textarea id="fx'+i+'" style="width:100%;min-height:190px;font:13px/1.55 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px"'
+    +(duz?'':' readonly')+'>'+esc(p.caption||"")+'</textarea>'
+    +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;clear:both">'+btn+'</div></div></div>';
+}
+
+function vFix(){
+  var s=site(); if(!s) return empty("check","Site yok","");
+  var posts=(s.soc.posts||[]);
+  var bekleyen=posts.filter(function(p){return p.status==="ready";});
+  var son=posts.filter(function(p){return p.status!=="ready";}).slice(-6).reverse();
+  var yardim='<div class="card" style="margin-bottom:14px"><div style="padding:12px">'
+    +'<b>Onay kuyru&#287;u nas&#305;l &#231;al&#305;&#351;&#305;yor</b>'
+    +'<p class="sub" style="margin:6px 0 0">Sitenin YAML&#39;&#305;nda <code>social.approval: true</code> ise g&#246;nderi &#252;retiliyor ama yay&#305;nlanm&#305;yor; burada <b>ready</b> olarak bekliyor. Metnini de&#287;i&#351;tirebilir, onaylayabilir ya da reddedebilirsin. Onaylad&#305;klar&#305;n ilk sosyal turda yay&#305;na &#231;&#305;k&#305;yor.<br><b>approval</b> kapal&#305;ysa g&#246;nderi &#252;retildi&#287;i anda &#231;&#305;k&#305;yor ve burada yaln&#305;zca ge&#231;mi&#351;i g&#246;r&#252;rs&#252;n.</p></div></div>';
+  var a = bekleyen.length
+    ? '<h3 style="margin:16px 0 10px">Onay bekleyen ('+bekleyen.length+')</h3>'
+      + bekleyen.map(function(p){return fixKart(p, posts.indexOf(p), true);}).join("")
+    : empty("check","Onay bekleyen g&#246;nderi yok","Ya hepsi yay&#305;nland&#305; ya da onay modu kapal&#305;.");
+  var b = son.length ? '<h3 style="margin:22px 0 10px">Son g&#246;nderiler</h3>'
+      + son.map(function(p){return fixKart(p, posts.indexOf(p), false);}).join("") : "";
+  return yardim + a + b;
+}
+
+async function fixYaz(i, degisiklik, mesaj){
+  var s=site(); var yol="data/"+S.cur+"/social.json";
+  var q=s.soc; var p=(q.posts||[])[i];
+  if(!p){ toast("G&#246;nderi bulunamad&#305;"); return; }
+  degisiklik(p);
+  await put(yol, q, mesaj);
+  render(); toast(mesaj);
+}
+function fixKaydet(i){ var v=$("fx"+i).value;
+  return fixYaz(i, function(p){p.caption=v; p.edited_by="panel";}, "metin elle duzeltildi"); }
+function fixOnay(i){ var v=$("fx"+i).value;
+  return fixYaz(i, function(p){p.caption=v; p.status="approved"; p.edited_by="panel";}, "gonderi onaylandi"); }
+function fixRed(i){
+  return fixYaz(i, function(p){p.status="skipped"; p.skip_reason="panelden reddedildi";}, "gonderi reddedildi"); }
+
+/* ---------- Site ekle ---------- */
+function vAdd(){
+  function sat(id,et,ph,val){
+    return '<label style="display:block;margin-bottom:10px"><div class="sub" style="margin-bottom:4px">'+et+'</div>'
+      +'<input id="'+id+'" placeholder="'+(ph||"")+'" value="'+(val||"")+'" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px"></label>';
+  }
+  return '<div class="card"><div style="padding:14px">'
+   +'<p class="sub" style="margin:0 0 14px">Form <code>sites/&lt;alan ad&#305;&gt;.yaml</code>, <code>topics.json</code> ve <code>facts.yaml</code> dosyalar&#305;n&#305; olu&#351;turur. <b>Secret&#39;lar ve workflow env sat&#305;rlar&#305; GitHub&#39;dan elle eklenir</b> &mdash; parola panele girilmez.</p>'
+   +sat("naDom","Alan ad&#305;","istanbulturkishbath.com")
+   +sat("naSlug","K&#305;sa ad (secret adlar&#305;nda kullan&#305;l&#305;r)","istanbulturkishbath")
+   +sat("naIg","Instagram kullan&#305;c&#305; ad&#305;","istanbulturkishbath")
+   +sat("naLayout","G&#246;rsel dili: auto (kartl&#305;) ya da duz (yaz&#305;s&#305;z foto&#287;raf)","duz","duz")
+   +sat("naAccent","Vurgu rengi","#c9972f","#c9972f")
+   +sat("naBrand","Marka ad&#305;","Istanbul Turkish Bath")
+   +sat("naWeek","Haftada ka&#231; yaz&#305;","3","3")
+   +'<label style="display:block;margin-bottom:10px"><div class="sub" style="margin-bottom:4px">Kategoriler &mdash; her sat&#305;r: <code>slug | G&#246;r&#252;nen ad | e&#351;le&#351;me,kelimeleri</code></div>'
+   +'<textarea id="naCats" style="width:100%;min-height:120px;font:13px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px" placeholder="hamam-guide | Hamam Guide | what to wear,etiquette,tipping"></textarea></label>'
+   +'<div style="margin-top:12px"><button class="btn" onclick="siteOlustur()">Siteyi olu&#351;tur</button></div>'
+   +'<div id="naOut" style="margin-top:14px"></div></div></div>';
+}
+
+async function siteOlustur(){
+  function v(id){ return ($(id).value||"").trim(); }
+  var dom=v("naDom"), slug=v("naSlug")||dom.split(".")[0];
+  if(!dom || dom.indexOf(".")<0){ toast("Alan adi gerekli"); return; }
+  var BUYUK=slug.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  var hafta=parseInt(v("naWeek")||"3",10);
+  var cats=(v("naCats")||"").split("\n").map(function(r){return r.split("|").map(function(x){return x.trim();});})
+    .filter(function(r){return r.length>=2 && r[0];});
+  var catYaml=cats.map(function(r){
+    var kel=(r[2]||"").split(",").map(function(x){return x.trim();}).filter(Boolean).join(", ");
+    return '    - {name: "'+r[1]+'", slug: "'+r[0]+'",\n       match: ['+kel+']}';
+  }).join("\n") || '    - {name: "General", slug: "general", match: [guide]}';
+  var bugun=new Date().toISOString().slice(0,10);
+
+  var y=[];
+  y.push("# "+dom+" — panelden olusturuldu "+bugun);
+  y.push("# Kural setleri: standart/1-blog-standardi.md ... 5-panel-kullanimi.md");
+  y.push("slug: "+slug);
+  y.push("domain: "+dom);
+  y.push("language: en");
+  y.push("timezone: Europe/Istanbul");
+  y.push("enabled: true");
+  y.push("");
+  y.push("# Ilk tur SHADOW: uretir, kuyruga yazar, YAYINLAMAZ.");
+  y.push("mode: shadow");
+  y.push("");
+  y.push("wordpress:");
+  y.push("  api_base: https://"+dom+"/wp-json/wp/v2");
+  y.push("  user_env: WP_USER_"+BUYUK);
+  y.push("  app_password_env: WP_APPPASS_"+BUYUK);
+  y.push("  status: publish");
+  y.push("  default_category: "+(cats.length?cats[0][0]:"general"));
+  y.push("  target_categories:");
+  y.push(catYaml);
+  y.push("");
+  y.push("images:");
+  y.push("  enabled: true");
+  y.push("  provider: generated");
+  y.push("  real_photo_first: true");
+  y.push("  ai_photo: true");
+  y.push("  token_env: OPENAI_API_KEY");
+  y.push("  per_article: 3");
+  y.push("  width: 1200");
+  y.push("  hero_size: [1200, 630]");
+  y.push("  language: en");
+  y.push("");
+  y.push("permalink:");
+  y.push('  structure: "/%postname%/"');
+  y.push("");
+  y.push("schedule:");
+  y.push("  posts_per_week: "+hafta);
+  y.push("  days: [monday, wednesday, friday]");
+  y.push('  publish_time: "09:00"');
+  y.push("");
+  y.push("social:");
+  y.push("  instagram_handle: "+v("naIg"));
+  y.push("  provider: meta");
+  y.push("  posts_per_week: "+hafta);
+  y.push("  # --discover ile token'a sorulup yazilacak, ELLE TAHMIN EDILMEYECEK");
+  y.push('  instagram_user_id: ""');
+  y.push('  facebook_page_id: ""');
+  y.push('  business_id: "287905324376170"');
+  y.push("  token_env: META_ACCESS_TOKEN");
+  y.push("  approval: true");
+  y.push("  design:");
+  y.push('    accent: "'+(v("naAccent")||"#c9972f")+'"');
+  y.push('    paper: "#f4efe4"');
+  y.push("    layout: "+(v("naLayout")||"duz"));
+  y.push("    wordmark: "+dom);
+  y.push('  location_default: "114008537024577"');
+  y.push("  mix:");
+  y.push("    article_derived: "+hafta);
+  y.push("    location_spotlight: 0");
+  y.push("    seasonal_practical: 0");
+  y.push("  require_real_photo: false");
+  y.push("");
+  y.push("business:");
+  y.push("  primary_city: Istanbul, Turkiye");
+  y.push("  monetisation: direct");
+  y.push("");
+  y.push("link_map:");
+  y.push("  own_brands:");
+  y.push('    - {name: "'+(v("naBrand")||dom)+'", url: "https://'+dom+'", match: ['+slug+']}');
+  y.push("  post_sitemap: https://"+dom+"/post-sitemap.xml");
+  y.push("  policy:");
+  y.push("    min_internal_links: 3");
+  y.push("    max_internal_links: 8");
+  y.push("");
+  y.push("quality_gate:");
+  y.push("  min_words: 1100");
+  y.push("  max_words: 2200");
+  y.push("  require_faq_min: 5");
+  y.push("  min_seo_score: 75");
+  y.push("  max_similarity_to_existing: 0.72");
+  y.push("  fail_on:");
+  y.push("    - unverified_number");
+  y.push("    - internal_links_below_min");
+  y.push("    - broken_link");
+  y.push("    - banned_phrase");
+  y.push("");
+
+  var out=$("naOut");
+  try{
+    await putRaw("sites/"+dom+".yaml", y.join("\n"), "panel: "+dom+" site tanimi");
+    await put("data/"+dom+"/topics.json",
+      {note:"panelden olusturuldu", generated:bugun, topics:[]},
+      "panel: "+dom+" konu havuzu");
+    await putRaw("data/"+dom+"/facts.yaml",
+      "# "+dom+" fact base\n# BOS DOSYA YAZI URETTIRMEZ: kalite kapisi her rakami\n"
+      +"# buraya soruyor. Dogrulanmis veri eklenmeden tur calismaz.\nmeta:\n  last_reviewed: "+bugun+"\n",
+      "panel: "+dom+" fact base iskeleti");
+    out.innerHTML='<div class="card"><div style="padding:12px"><b>Dosyalar olu&#351;turuldu.</b>'
+      +'<p class="sub" style="margin:8px 0 0">Kalan &#252;&#231; ad&#305;m <b>sende</b>:</p>'
+      +'<ol class="sub" style="margin:6px 0 0 18px;line-height:1.7">'
+      +'<li>WordPress &rarr; Users &rarr; Profile &rarr; Application Passwords &rarr; parola &#252;ret</li>'
+      +'<li>GitHub &rarr; Settings &rarr; Secrets &rarr; <code>WP_USER_'+BUYUK+'</code> ve <code>WP_APPPASS_'+BUYUK+'</code></li>'
+      +'<li><code>.github/workflows/daily.yml</code> i&#231;indeki &#304;K&#304; ad&#305;m&#305;n env blo&#287;una bu iki secret sat&#305;r&#305;n&#305; ekle</li></ol>'
+      +'<p class="sub" style="margin:8px 0 0">Sonra <code>facts.yaml</code> ve <code>topics.json</code> doldurulacak; site <b>shadow</b> modda ba&#351;l&#305;yor.</p></div></div>';
+    toast("Site tanimi yazildi");
+  }catch(e){
+    out.innerHTML='<div class="card"><div style="padding:12px">Hata: '+esc(e.message)+'</div></div>';
+  }
+}
+
+
 (function(){
   for(const el of document.querySelectorAll("[data-ico]"))
     el.insertAdjacentHTML("afterbegin", ico(el.dataset.ico));
