@@ -1698,12 +1698,22 @@ function vAdd(){
    +sat("naAccent","Vurgu rengi","#c9972f","#c9972f")
    +sat("naWeek","Haftada ka&#231; yaz&#305;","3","3")
    +sat("naLang","&#304;&#231;erik dili","en","en")
+   +sat("naGsc","Search Console m&#252;lk&#252; &mdash; bo&#351; b&#305;rak&#305;rsan sc-domain:&lt;alan ad&#305;&gt;","sc-domain:istanbulturkishbath.com")
    +'<div style="margin-top:12px"><button class="btn" id="naBtn" onclick="siteOlustur()">Siteyi olu&#351;tur</button></div>'
    +'<div id="naOut" style="margin-top:14px"></div></div></div>'
    +'<div class="card" style="margin-top:14px"><div style="padding:14px">'
    +'<b>Yay&#305;n modu &mdash; ' + esc(S.cur) + '</b>'
    +'<div id="modDurum" class="sub" style="margin:8px 0 0">&hellip;</div>'
    +'<div style="margin-top:10px"><button class="btn sm" id="modBtn" onclick="modCevir()">Yay&#305;n modu</button></div>'
+   +'</div></div>'
+   +'<div class="card" style="margin-top:14px"><div style="padding:14px">'
+   +'<b>Anahtar kelimeler &mdash; Search Console</b>'
+   +'<p class="sub" style="margin:6px 0 0">Konu havuzu her pazartesi Search Console&#39;dan besleniyor: her sitenin <b>kendi m&#252;lk&#252;</b> ayr&#305; sorgulan&#305;yor. &#304;stersen &#351;imdi &#231;ek &mdash; bo&#351; b&#305;rak&#305;lan site t&#252;m siteleri &#231;eker.</p>'
+   +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+   +'<button class="btn sm" onclick="scCek(1)">Bu siteyi &#231;ek</button>'
+   +'<button class="btn sm" onclick="scCek(0)">B&#252;t&#252;n siteleri &#231;ek</button>'
+   +'</div>'
+   +'<p class="sub" style="margin:10px 0 0">Sonu&#231; <b>&#199;al&#305;&#351;malar</b> ekran&#305;nda; servis hesab&#305;n&#305;n e-postas&#305; log&#39;un ilk sat&#305;r&#305;nda yaz&#305;yor.</p>'
    +'</div></div>';
 }
 
@@ -1723,7 +1733,8 @@ async function siteOlustur(){
         brand_name: v("naBrand"),
         instagram: v("naIg").replace(/^@/,""),
         layout: v("naLayout") || "duz",
-        accent: v("naAccent") || "#c9972f"
+        accent: v("naAccent") || "#c9972f",
+        gsc_property: v("naGsc")
       }})});
     out.innerHTML = '<div class="card"><div style="padding:12px">'
       +'<b>Kurulum ba&#351;lat&#305;ld&#305;.</b>'
@@ -1732,6 +1743,7 @@ async function siteOlustur(){
       +'<ol class="sub" style="margin:6px 0 0 18px;line-height:1.7">'
       +'<li>WordPress &rarr; Users &rarr; Profile &rarr; Application Passwords &rarr; parola &#252;ret</li>'
       +'<li>GitHub &rarr; Settings &rarr; Secrets &rarr; <code>WP_USER_'+slug.toUpperCase()+'</code> ve <code>WP_APPPASS_'+slug.toUpperCase()+'</code></li>'
+      +'<li>Search Console &rarr; bu sitenin m&#252;lk&#252; &rarr; Ayarlar &rarr; Kullan&#305;c&#305;lar ve izinler &rarr; <b>servis hesab&#305;n&#305;n e-postas&#305;n&#305;</b> okuyucu olarak ekle</li>'
       +'</ol>'
       +'<p class="sub" style="margin:8px 0 0">&#304;&#351; ak&#305;&#351;&#305; dosyas&#305;na art&#305;k dokunulmuyor. Sonra konu havuzunu ve fact base&#39;i doldur, birka&#231; taslak g&#246;r&#252;p yay&#305;n modunu <b>live</b> yap.</p>'
       +'</div></div>';
@@ -1741,6 +1753,15 @@ async function siteOlustur(){
     out.innerHTML = '<div class="card"><div style="padding:12px">Hata: '+esc(e.message)+'</div></div>';
   }
   b.disabled = false; b.textContent = "Siteyi olustur";
+}
+
+async function scCek(tekSite){
+  try{
+    await gh("/actions/workflows/candidates.yml/dispatches", {method:"POST",
+      body: JSON.stringify({ref:"main", inputs:{
+        site: tekSite ? S.cur : "", promote: "true", limit: "8"}})});
+    toast(tekSite ? "Search Console cekiliyor: " + S.cur : "Butun siteler cekiliyor");
+  }catch(e){ toast("Baslatilamadi: " + e.message); }
 }
 
 async function modOku(){
