@@ -113,6 +113,30 @@ main{min-width:0}
 .tile .num .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:5px;
   letter-spacing:0}
 
+/* --- yayınlananlar --- */
+.pubgrid{display:flex;flex-direction:column}
+.pubcard{display:flex;gap:16px;padding:14px 17px;border-top:1px solid var(--line-2)}
+.pubcard:first-child{border-top:0}
+.pubmain{flex:1;min-width:0}
+.pubtop{display:flex;align-items:center;gap:10px}
+.pubttl{display:block;margin-top:7px;font-size:14.5px;font-weight:600;
+  letter-spacing:-.01em;color:var(--ink);text-decoration:none;line-height:1.35}
+.pubttl:hover{color:var(--brand-ink);text-decoration:underline}
+.publang{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.publang .chip{text-decoration:none;text-transform:uppercase;font-size:10.5px;
+  letter-spacing:.04em}
+.publang a.chip:hover{border-color:var(--brand);color:var(--brand-ink)}
+.chip.bad{color:var(--red);border-color:var(--red);text-transform:none;
+  letter-spacing:0}
+.pubsoc{width:268px;flex:none;display:flex;gap:10px;align-items:flex-start}
+.pubsoc img{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:none}
+.pubsoc .socno{width:64px;height:64px;flex:none}
+.pubsoctext{min-width:0}
+.pubsoctext p{margin:6px 0 0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.pubsocno{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.pubsocno svg{width:14px;height:14px}
+@media (max-width:900px){.pubcard{flex-direction:column}.pubsoc{width:auto}}
+
 /* --- saglik bannerı: sessiz duruşun tek görünür yeri --- */
 .hbanner{border:1px solid var(--amber);background:var(--amber-soft);color:var(--amber);
   border-radius:var(--r);padding:13px 15px;margin-bottom:14px}
@@ -362,6 +386,7 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
       <button data-v="kw" data-ico="key" onclick="go('kw')"><span>Anahtar kelimeler</span><span class="count" id="cKw">0</span></button>
       <button data-v="cand" data-ico="seed" onclick="go('cand')"><span>Aday kelimeler</span><span class="count" id="cCand">0</span></button>
       <button data-v="soc" data-ico="share" onclick="go('soc')"><span>Sosyal medya</span><span class="count" id="cSoc">0</span></button>
+ <button data-v="pub" data-ico="check" onclick="go('pub')"><span>Yayınlananlar</span><span class="count" id="cPub">0</span></button>
       <div class="lbl">Denetim</div>
       <button data-v="sc" data-ico="chart" onclick="go('sc')"><span>Analitik</span></button>
       <button data-v="seo" data-ico="gauge" onclick="go('seo')"><span>SEO skoru</span><span class="count" id="cSeo">0</span></button>
@@ -562,6 +587,7 @@ function render(){
     $("cCand").textContent=(s.cand.harvested||[]).filter(h=>h.status==="new"||h.status==="approved").length;
     $("cSeo").textContent=scored(s).length;
     $("cSoc").textContent=(s.soc.posts||[]).filter(p=>p.status==="ready").length;
+    $("cPub").textContent=sonHafta(s).length;
     $("cFix").textContent=(s.soc.posts||[]).filter(p=>p.status==="ready").length;
   }
   const meta={
@@ -574,6 +600,7 @@ function render(){
     runs:["Çalışmalar","Otomasyonun geçmişi"],
     sc:["Analitik","Google aramada gerçekte ne oluyor"],
     soc:["Sosyal medya","Haftanın gönderileri ve elle müdahale"],
+   pub:["Yayınlananlar","Çıkan yazılar, dilleri ve gönderileri — canlıdaki hâliyle"],
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
     cost:["Maliyet","Her turun gerçek para karşılığı"],
     std:["Standartlar","Motorun uyduğu kurallar — verilen kararların tam listesi"],
@@ -581,7 +608,7 @@ function render(){
     add:["Site ekle","Yeni bir siteyi sisteme tanıt"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,cost:vCost,std:vStd,fix:vFix,add:vAdd})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,pub:vPub,cost:vCost,std:vStd,fix:vFix,add:vAdd})[VIEW]();
 }
 
 /* ===================== analitik (Search Console) =====================
@@ -672,6 +699,88 @@ function vSC(){
    "çıkarma". Metni panelden düzenletmiyorum — düzenlenen metin bir sonraki
    turda motor tarafından üzerine yazılırdı ve kullanıcı emeğinin kaybolduğunu
    geç fark ederdi. */
+/* ===================== yayinlananlar =====================
+   DENETIM EKRANI. Sistemin gercekten ne cikardigini gormek icin panelde yol
+   yoktu: SEO ekrani puani gosteriyor ama CANLI YAZIYA LINK VERMIYOR, ceviriler
+   ise hicbir yerde gorunmuyordu — bir dilin sessizce dusmesi bu yuzden fark
+   edilmiyordu. Burada her yazi, dilleri ve o yazinin gonderisi yan yana. */
+const DIL_ADI={en:"İngilizce",de:"Almanca",fr:"Fransızca",es:"İspanyolca",
+  it:"İtalyanca",pt:"Portekizce",nl:"Felemenkçe",ru:"Rusça",tr:"Türkçe",
+  ar:"Arapça",zh:"Çince",ja:"Japonca",ko:"Korece",el:"Yunanca",he:"İbranice",
+  pl:"Lehçe"};
+
+function gunFarki(iso){
+  const t=Date.parse(String(iso||"")+"T00:00:00");
+  return isNaN(t)?null:Math.floor((Date.now()-t)/86400000);
+}
+function sonHafta(s){
+  return (s.published||[]).filter(p=>{const g=gunFarki(p.date);return g!==null&&g<=7;});
+}
+function cevSay(p){ return (((p.translations||{}).languages)||[]).length; }
+function cevHata(p){ return Object.keys(((p.translations||{}).errors)||{}); }
+
+function vPub(){
+  const s=site(); if(!s) return empty("globe","Site yok","");
+  const yazilar=(s.published||[]).slice().reverse();
+  if(!yazilar.length) return empty("check","Henüz yayınlanan yazı yok",
+    "İlk tur çalıştığında çıkan yazı, dilleri ve gönderisi burada görünecek.");
+
+  const hafta=sonHafta(s);
+  const dilSay=hafta.reduce((n,p)=>n+cevSay(p),0);
+  const eksik=yazilar.filter(p=>cevHata(p).length||p.translation_error);
+  const ortSeo=Math.round(yazilar.reduce((n,p)=>n+(p.seo_score||0),0)/yazilar.length);
+  const ceviriliMi=yazilar.some(p=>p.translations);
+
+  const tiles=`<div class="tiles">
+    <div class="tile accent"><div class="lab">${ico("check")}Son 7 gün</div>
+      <div class="num">${hafta.length}</div><div class="sub">yazı yayınlandı</div></div>
+    ${ceviriliMi?`<div class="tile"><div class="lab">${ico("globe")}Çeviri</div>
+      <div class="num">${dilSay}</div><div class="sub">son 7 günde çıkan dil sürümü</div></div>
+    <div class="tile ${eksik.length?"badt":""}"><div class="lab">${ico("alert")}Düşen dil</div>
+      <div class="num">${eksik.length}</div><div class="sub">çevirisi eksik kalan yazı</div></div>`:""}
+    <div class="tile"><div class="lab">${ico("gauge")}Ortalama SEO</div>
+      <div class="num">${ortSeo}</div><div class="sub">${yazilar.length} yazı toplam</div></div>
+  </div>`;
+
+  const kart=p=>{
+    const dil=((p.translations||{}).languages)||[];
+    const hata=((p.translations||{}).errors)||{};
+    // Gonderi yaziya link uzerinden bagli; link yoksa basliga duselim.
+    const post=(s.soc.posts||[]).find(x=>(x.link&&p.url&&x.link===p.url)
+      ||(x.subject&&p.title&&x.subject===p.title));
+    const g=p.seo_grade||"—";
+    const durum=post?(post.status==="published"?["brand","gönderi yayında"]
+      :post.status==="ready"?["amber","gönderi kuyrukta"]:["","gönderi atlandı"]):null;
+    return `<div class="pubcard">
+      <div class="pubmain">
+        <div class="pubtop">
+          <span class="gr g-${esc(g)}" style="pointer-events:none"><b>${Math.round(p.seo_score||0)}</b>
+            <span style="color:var(--muted)">/100</span><i>${esc(g)}</i></span>
+          <span class="hint">${esc(p.date||"")}</span>
+        </div>
+        <a class="pubttl" href="${esc(p.url||"#")}" target="_blank" rel="noopener">${esc(p.title||p.slug||"")}</a>
+        ${(dil.length||Object.keys(hata).length)?`<div class="publang">
+          ${dil.map(d=>`<a class="chip" href="${esc(d.url||"#")}" target="_blank" rel="noopener"
+            title="${esc(DIL_ADI[d.lang]||d.lang)}">${esc(d.lang)}</a>`).join("")}
+          ${Object.entries(hata).map(([k,v])=>`<span class="chip bad"
+            title="${esc(v)}">${esc(k)} çıkmadı</span>`).join("")}</div>`:""}
+        ${p.translation_error?`<div class="err" style="margin-top:8px">Çeviri katmanı hatası: ${esc(p.translation_error)}</div>`:""}
+      </div>
+      <div class="pubsoc">
+        ${post?`${post.image_url?`<img src="${esc(post.image_url)}" alt="${esc(post.image_alt||"")}" loading="lazy">`
+          :`<div class="socno">${ico("alert")}<span>görsel yok</span></div>`}
+          <div class="pubsoctext">
+            <span class="pill ${durum[0]}"><span class="dot"></span>${esc(durum[1])}</span>
+            <p>${esc(post.caption||"").slice(0,170)}</p></div>`
+        :`<div class="pubsocno">${ico("alert")}<span>bu yazının gönderisi yok</span></div>`}
+      </div></div>`;
+  };
+
+  return tiles+`<div class="panelbox"><header><h2>Çıkan yazılar</h2><span class="sp"></span>
+    <span class="hint">Başlığa tıkla, canlı yazıyı aç</span></header>
+    <div class="pubgrid">${yazilar.map(kart).join("")}</div></div>`;
+}
+
 function vSoc(){
   const s=site(); if(!s) return empty("share","Site yok","");
   const posts=(s.soc.posts||[]).slice().reverse();
