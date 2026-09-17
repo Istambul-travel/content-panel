@@ -113,6 +113,13 @@ main{min-width:0}
 .tile .num .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:5px;
   letter-spacing:0}
 
+/* --- saglik bannerı: sessiz duruşun tek görünür yeri --- */
+.hbanner{border:1px solid var(--amber);background:var(--amber-soft);color:var(--amber);
+  border-radius:var(--r);padding:13px 15px;margin-bottom:14px}
+.hbanner.hbad{border-color:var(--red);background:var(--red-soft);color:var(--red)}
+.hbanner .hbas{font-weight:650;font-size:14px;letter-spacing:-.01em}
+.hbanner .halt{font-size:12.5px;margin-top:4px;color:var(--ink-2);line-height:1.45}
+
 /* --- analitik --- */
 .scbar{display:flex;height:34px;border-radius:8px;overflow:hidden;background:var(--line-2)}
 .scseg{display:flex;align-items:center;justify-content:center;min-width:2px;
@@ -519,17 +526,17 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
       ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
-      ghJson(`data/${d}/cost.json`)]);
+      ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]}});
+      cost:ct||{runs:[]},health:hl||{}});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -897,6 +904,62 @@ function vSeo(){
   return tiles + list + weakBox + howBox;
 }
 
+// SESSIZ DURUS — bu panelin en onemli isi.
+//
+// Bir isin patlamasi kotu ama gorunur. Asil tehlike isin HIC CALISMAMASI:
+// hata yok, kirmizi yok, sadece hicbir sey olmuyor. GitHub, deposu 60 gun
+// hareketsiz kalan programli isleri kendiliginden kapatiyor; kota dolabiliyor,
+// secret suresi bitebiliyor. Hicbiri "failure" uretmiyor, o yuzden hata
+// kancasiyla yakalanmiyor.
+//
+// Olcu bu yuzden "hata verdi mi" degil: SON BASARILI TURUN USTUNDEN NE KADAR
+// GECTI. Motor her turun sonunda data/<site>/health.json dosyasina nabiz
+// atiyor; burasi bayatlayani yuksek sesle soyluyor.
+const ISLER={daily:{ad:"Günlük içerik",saat:24},
+             candidates:{ad:"Aday kelime turu",saat:168}};
+function saglikDurum(s){
+  const h=s.health||{}, ok=h.last_ok||{}, out=[];
+  for(const k of Object.keys(ISLER)){
+    const v=ISLER[k], son=ok[k], esik=v.saat*2;
+    let gecen=null;
+    if(son){ const ts=Date.parse(son); if(!isNaN(ts)) gecen=(Date.now()-ts)/3600000; }
+    const durum = gecen===null ? "bilinmiyor"
+                : gecen>esik*2 ? "durmus"
+                : gecen>esik   ? "bayat" : "ok";
+    out.push({kod:k,ad:v.ad,durum:durum,gecen:gecen,esik:esik,son:h[k]||{}});
+  }
+  return out;
+}
+function saatMetni(x){
+  if(x.gecen===null) return "hiç çalışmamış";
+  if(x.gecen<48) return Math.round(x.gecen)+" saat önce";
+  return Math.round(x.gecen/24)+" gün önce";
+}
+function saglikBanner(s){
+  const kart=[];
+  for(const x of saglikDurum(s).filter(y=>y.durum!=="ok")){
+    const agir = x.durum==="durmus" || x.durum==="bilinmiyor";
+    const ne = x.durum==="bilinmiyor" ? "hiç çalışmamış"
+             : x.durum==="durmus" ? "durmuş" : "gecikmiş";
+    kart.push({agir:agir, bas:x.ad+" "+ne,
+      alt:"Son başarılı tur: "+saatMetni(x)+". Beklenen aralık "+x.esik+" saatten kısa."
+        +((x.son&&x.son.ok===false&&x.son.note) ? " Son tur hata verdi: "+esc(String(x.son.note)) : "")});
+  }
+  // Bütçe rakamları motorun yazdığı nabızdan geliyor: tavanı bilen tek yer
+  // motor, panel kendi varsayımını uydurmuyor.
+  const hd=(s.health||{}).daily||{};
+  const b=hd.detail && hd.detail.butce;
+  if(b && b.durum==="asildi") kart.push({agir:true,
+    bas:"Bütçe tavanı aşıldı — üretim durdu",
+    alt:"Bu ay "+Number(b.harcanan).toFixed(2)+" / "+Number(b.tavan).toFixed(2)+" USD. "
+       +"Ay dönünce kendiliğinden devam eder. Tavan: config/global.yaml → safety.max_usd_per_month_per_site"});
+  else if(b && b.durum==="uyari") kart.push({agir:false,
+    bas:"Bütçe tavanına yaklaşıldı",
+    alt:"Bu ay "+Number(b.harcanan).toFixed(2)+" / "+Number(b.tavan).toFixed(2)+" USD harcandı."});
+  if(!kart.length) return "";
+  return kart.map(k=>`<div class="hbanner${k.agir?" hbad":""}">`
+    +`<div class="hbas">${esc(k.bas)}</div><div class="halt">${k.alt}</div></div>`).join("");
+}
 function vDash(){
   const s=site(); if(!s) return empty("globe","Site yok","sites/ klasöründe tanımlı site bulunamadı.");
   const all=S.sites.flatMap(x=>x.topics);
@@ -910,7 +973,7 @@ function vDash(){
   const upcoming=s.topics.filter(t=>t.scheduled_for&&t.status==="pending"&&t.scheduled_for>=today)
     .sort((a,b)=>a.scheduled_for.localeCompare(b.scheduled_for)).slice(0,5);
 
-  const tiles=`<div class="tiles">
+  const tiles=saglikBanner(s)+`<div class="tiles">
     <div class="tile"><div class="lab">${ico('check')}Yayınlanan yazı</div>
       <div class="num">${pubN}</div><div class="sub">${S.sites.length>1?`${S.sites.length} sitede toplam`:esc(s.domain)}</div></div>
     <div class="tile accent"><div class="lab">${ico('cal')}Takvimde planlı</div>
