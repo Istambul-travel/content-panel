@@ -1041,7 +1041,9 @@ function vKw(){
       <div class="main"><div class="t">${esc(t.topic)}</div><div class="m">
         ${t.keyword?`<span>${esc(t.keyword)}</span>`:""}
         ${volLabel(t)}
+        ${scLabel(t)}
         ${compLabel(t)}
+        ${srcLabel(t)}
         ${t.own_brand?`<span class="pill brand">${esc(t.own_brand)}</span>`
           :t.affiliate?`<span class="pill">affiliate</span>`:""}
       </div></div>
@@ -1110,8 +1112,10 @@ function vCand(){
       const j=JSON.stringify(h.keyword).replace(/"/g,"&quot;");
       return `<div class="kwrow">
         <div class="main"><div class="t">${esc(h.keyword)}</div><div class="m">
-          ${h.volume_range?`<span>${esc(h.volume_range)}/ay</span>`:`<span class="muted">hacim yok</span>`}
+          ${volLabel(h)}
+          ${scLabel(h)}
           ${compLabel(h)}
+          ${srcLabel(h)}
           <span>bulundu ${esc(h.found_at||"")}</span>
         </div></div>
         ${h.status==="approved"?`<span class="pill blue"><span class="dot"></span>onaylandı</span>`
@@ -1470,9 +1474,41 @@ function volSourceNote(s){
 function volLabel(t){
   if(t.volume_range&&t.volume_range!=="veri yok")
     return `<span title="Google Ads, 6 pazar, son 12 ay">${esc(t.volume_range)}/ay</span>`;
-  if(t.volume_range==="veri yok") return `<span class="muted">hacim verisi yok</span>`;
   if(t.search_volume) return `<span>${nf(t.search_volume)}/ay</span>`;
   if(t.volume) return `<span>${nf(t.volume)}/ay</span>`;
+  // Search Console adayinda ARAMA HACMI YOK. Google o uctan hacim vermiyor;
+  // kanit kendi sayfamizin o sorguda aldigi gosterim — tahmin degil olcum.
+  // "hacim yok" yazmak yaniltiyordu: kanit var, turu farkli.
+  if(t.sc_impressions){
+    const ay=Math.round(t.sc_impressions/3);
+    return `<span title="Search Console &mdash; 90 gunde ${nf(t.sc_impressions)} gosterim, ayda yaklasik ${nf(ay)}. Arama hacmi degil, bizim sayfamizin olculen gosterimi.">${nf(t.sc_impressions)} gösterim<span class="muted">/90g</span></span>`;
+  }
+  if(t.volume_range==="veri yok") return `<span class="muted">hacim verisi yok</span>`;
+  return "";
+}
+
+// Search Console firsatinin turu ve siramiz. Uc tur uc ayri is demek:
+//   striking (8-30)  2. sayfadayiz, bir yazi ilk sayfaya tasiyabilir
+//   buried   (30+)   talep var, karsiligi yok
+//   ctr_gap  (1-10)  goruluyor ama tiklanmiyor — havuza hic girmiyor
+function scLabel(t){
+  if(!t.sc_kind && t.sc_position==null) return "";
+  const m={striking:"2. sayfada",buried:"karşılığı yok",ctr_gap:"tıklanmıyor"};
+  const ip={striking:"8-30. sırada — bir yazı ilk sayfaya taşıyabilir",
+            buried:"30+ sırada — talep var, karşılığı yok",
+            ctr_gap:"1-10. sırada ama tıklanmıyor — başlık/meta işi"};
+  const p=t.sc_position!=null?`${Math.round(t.sc_position)}. sıra`:"";
+  const k=m[t.sc_kind]||t.sc_kind||"";
+  return `<span class="pill" title="${esc(ip[t.sc_kind]||"")}">${esc([p,k].filter(Boolean).join(" · "))}</span>`;
+}
+
+// Kanit turu. Ikisi ayni olcek degil: Keyword Planner TAHMIN veriyor,
+// Search Console OLCUM. Hangisinden geldigi gorunmeli.
+function srcLabel(t){
+  if(t.source==="search-console")
+    return `<span class="pill" title="Kanıt: kendi sitemizde ölçülen gösterim">Search Console</span>`;
+  if(t.source==="keyword-planner")
+    return `<span class="pill" title="Kanıt: Google&rsquo;ın arama hacmi tahmini">Keyword Planner</span>`;
   return "";
 }
 function compLabel(t){
