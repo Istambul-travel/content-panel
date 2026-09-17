@@ -1522,8 +1522,11 @@ function scoreWhy(t){
   const p=t.score_parts;
   if(!p) return "konu önceliği";
   const L={search_volume:"hacim",commercial_intent:"ticari niyet",
-           own_product_match:"kendi ürünü",gap:"boşluk"};
-  const parts=Object.entries(L).map(([k,l])=>`${l} ${(p[k]??0).toFixed(2)}`).join(" · ");
+           own_product_match:"kendi ürünü",gap:"boşluk",
+           payoff_proximity:"geri dönüş yakınlığı"};
+  // Eksik bileşeni 0,00 diye göstermek yanlış olur: o konu henüz yeni
+  // ağırlıkla puanlanmamış demektir, sıfır puan almış demek değil.
+  const parts=Object.entries(L).filter(([k])=>p[k]!==undefined).map(([k,l])=>`${l} ${(p[k]??0).toFixed(2)}`).join(" · ");
   return t.score_boost
     ? `${parts}\notomatik ${(t.score_auto??0).toFixed(2)} + elle ${t.score_boost>0?"+":""}${t.score_boost.toFixed(2)}`
     : parts;
