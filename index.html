@@ -113,6 +113,16 @@ main{min-width:0}
 .tile .num .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:5px;
   letter-spacing:0}
 
+/* --- yayın programı gün seçici --- */
+.gunler{display:flex;flex-wrap:wrap;gap:7px}
+.gun{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;
+  border:1px solid var(--line);border-radius:999px;font-size:13px;cursor:pointer;
+  background:var(--surface);user-select:none}
+.gun:hover{border-color:var(--brand)}
+.gun.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  font-weight:600}
+.gun input{accent-color:var(--brand);margin:0}
+
 /* --- yayınlananlar --- */
 .pubgrid{display:flex;flex-direction:column}
 .pubcard{display:flex;gap:16px;padding:14px 17px;border-top:1px solid var(--line-2)}
@@ -1497,6 +1507,87 @@ function vStd(){
     "<strong>Kalıcı bağlantı yapısı.</strong> <code>/blog/</code> öneki iki kez denendi, iki kez geri alındı: 199 lokasyon sayfasını <code>/blog/location/...</code> adresine taşıyıp 404 yapıyor. Site <code>/%postname%/</code> kalıyor."]);
 }
 
+/* ---------- Yayın programı ----------
+   17.09.2026'ya kadar panel YAML'dan yalnızca iki anahtarı değiştirebiliyordu:
+   mode ve social.approval. Yayın günlerini değiştirmek için dosyayı elle
+   düzenlemek gerekiyordu — yani sistemin en sık değişecek ayarı panelin
+   dışındaydı.
+
+   GÜN SAYISI İLE HAFTALIK ADET BİRLİKTE YAZILIYOR. Motor yayın gününü
+   days listesinden okuyor, yakıt göstergesi ise posts_per_week'ten; ikisi
+   ayrışırsa gösterge yalan söyler. */
+const GUNLER=[["monday","Pzt"],["tuesday","Sal"],["wednesday","Çar"],
+              ["thursday","Per"],["friday","Cum"],["saturday","Cmt"],
+              ["sunday","Paz"]];
+
+function seciliGunler(){
+  return [...document.querySelectorAll(".gun input:checked")].map(e=>e.value);
+}
+
+function programOzet(){
+  const e=$("programOzet"); if(!e) return;
+  const s=site(); const g=seciliGunler();
+  if(!g.length){ e.innerHTML="<b style='color:var(--red)'>En az bir gün seçmelisin</b> — "
+    +"hiç gün seçilmezse motor hiçbir zaman yazı çıkarmaz."; return; }
+  const uygun=(s.cand&&s.cand.runway&&s.cand.runway.eligible)||0;
+  const hafta=(uygun/g.length).toFixed(1);
+  const adlar=GUNLER.filter(([k])=>g.includes(k)).map(([,a])=>a).join(", ");
+  e.innerHTML="Haftada <b>"+g.length+"</b> yazı &middot; "+esc(adlar)
+    +" &middot; kuyruktaki "+uygun+" konu <b>"+hafta+" hafta</b> yeter"
+    +(g.length>4?" &middot; <span style='color:var(--amber)'>hızlı tempo: konu bankası "
+      +"daha çabuk tükenir</span>":"");
+}
+
+/* schedule bloğunun İÇİNDE değiştiriyor: yaml'ın başka yerinde de days
+   geçebilir, kör bir replace yanlış satırı bozar. */
+function yamlProgram(metin, gunler){
+  const i=metin.indexOf("\nschedule:");
+  if(i<0) return null;
+  const kalan=metin.slice(i+1);
+  const son=kalan.search(/\n(?=[A-Za-z_#])/);
+  let blok=son<0?kalan:kalan.slice(0,son);
+  if(!/\n\s*days:\s*\[/.test(blok)) return null;
+  blok=blok.replace(/(\n\s*days:\s*)\[[^\]]*\]/,"$1["+gunler.join(", ")+"]");
+  blok=/\n\s*posts_per_week:\s*\d+/.test(blok)
+    ? blok.replace(/(\n\s*posts_per_week:\s*)\d+/,"$1"+gunler.length)
+    : blok.replace(/(\n\s*days:)/,"\n  posts_per_week: "+gunler.length+"$1");
+  return metin.slice(0,i+1)+blok+(son<0?"":kalan.slice(son));
+}
+
+async function programKaydet(){
+  const g=seciliGunler();
+  if(!g.length){ toast("En az bir gün seçmelisin"); return; }
+  try{
+    const yol="sites/"+S.cur+".yaml";
+    const metin=await ghFile(yol);
+    const yeni=yamlProgram(metin,g);
+    if(!yeni){ toast("YAML içinde schedule.days bulunamadı"); return; }
+    await putRaw(yol,yeni,"panel: "+S.cur+" yayın programı = "+g.join(", "));
+    toast("Program kaydedildi: haftada "+g.length+" yazı");
+    await load();
+  }catch(e){ toast("Kaydedilemedi: "+e.message); }
+}
+
+function programKutusu(s){
+  const secili=new Set(s.days||[]);
+  setTimeout(programOzet,0);
+  return `<div class="panelbox" style="margin-top:0">
+    <header><h2>Yayın programı</h2><span class="sp"></span>
+      <span class="hint">${esc(s.domain)}</span></header>
+    <div style="padding:15px 17px">
+      <div class="sub" style="margin-bottom:11px">Hangi günler yazı çıksın.
+        İşaretli her gün <b>bir blog yazısı + o yazının sosyal gönderisi</b>
+        demek. Sabah 09:00'da çıkar.</div>
+      <div class="gunler">${GUNLER.map(([k,ad])=>`<label class="gun${secili.has(k)?" on":""}">
+        <input type="checkbox" value="${k}" ${secili.has(k)?"checked":""}
+        onchange="this.closest('.gun').classList.toggle('on',this.checked);programOzet()">
+        ${ad}</label>`).join("")}</div>
+      <div id="programOzet" class="sub" style="margin-top:13px"></div>
+      <div style="margin-top:13px"><button class="btn" onclick="programKaydet()">
+        ${ico("check")}<span>Programı kaydet</span></button></div>
+    </div></div>`;
+}
+
 function vSites(){
   const s=site(); if(!s) return empty("globe","Site yok","");
   const multi=S.sites.length>1;
@@ -1517,8 +1608,9 @@ function vSites(){
     <tbody>${S.sites.map(siteRow).join("")}</tbody></table></div>
     <div style="padding:13px 17px;font-size:12.5px;color:var(--muted);line-height:1.6;
       border-top:1px solid var(--line-2)">
-      Sosyal medya gönderileri henüz devrede değil: Instagram hesabı Business'a
-      çevrilip Facebook sayfasına bağlanınca bu satıra sosyal program da eklenecek.
+      Her yayın günü blog yazısıyla birlikte o yazının Instagram gönderisi de
+      çıkıyor; ayrı bir sosyal program yok. Doldurucu gönderiler (lokasyon,
+      mevsimlik) Sosyal medya ekranından elle tetikleniyor.
     </div></div>`;
 
   const fs=s.facts||{};
@@ -1549,14 +1641,14 @@ function vSites(){
 
   const addBox=`<div class="panelbox"><header><h2>Yeni site ekleme</h2></header>
     <div style="padding:15px 17px;font-size:13.5px;color:var(--ink-2);line-height:1.65">
-      Sistem çok siteli kurgulandı ama şu an bilerek tek siteyle çalışıyor:
-      ${esc(s.domain)} oturana kadar ikinci siteyi eklemek sadece gürültü olur.
-      İkinci site GitHub → Actions → <code>Yeni site ekle</code> ile eklenir;
-      eklendiği anda sol üstte site seçici geri gelir ve bütün ekranlar
-      seçili siteye göre çalışır.
+      Yeni site <b>Site ekle</b> ekranından eklenir — iş akışı dosyasına
+      dokunmak gerekmiyor. Eklendikten sonra tek elle yapılacak iki şey var:
+      WordPress application password'ünü repo secret'larına koymak ve Search
+      Console mülküne servis hesabının e-postasını eklemek. İkisi de Site ekle
+      ekranında adım adım yazıyor.
     </div></div>`;
 
-  return siteBox + brandBox + addBox;
+  return programKutusu(s) + siteBox + brandBox + addBox;
 }
 
 /* ===================== eylemler ===================== */
