@@ -601,17 +601,18 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct,hl]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl,tl]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
       ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
-      ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`)]);
+      ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`),
+      ghFile(`data/${d}/talimat.md`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]},health:hl||{}});
+      cost:ct||{runs:[]},health:hl||{},talimat:tl||""});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -1591,6 +1592,99 @@ function vCost(){
     </tr></thead><tbody>${runs.slice(0,60).map(satir).join("")}</tbody></table></div></div>`;
 }
 
+/* ===================== site talimatlari =====================
+   Standartlarin bir kismi kodda ve orada kalmali: fact base dogrulamasi,
+   kalite kapisi, link ve uzunluk esikleri. Ama "bu hesabin gonderileri
+   boyle olsun" karari sahibinindir ve her degistiginde kod degismemeli.
+   Burasi o karari yazdigi yer; motor her uretimde isteme ekliyor. */
+const TAL_BOLUM = [
+  ["sosyal metin", "Sosyal metin",
+   "Instagram ve Facebook metni — üslup, uzunluk, neyi söyleyip neyi söylemeyeceği",
+   "örnek: Soru sorma, doğrudan bilgi ver. Hiçbir gönderide “keşfet” ya da “büyüleyici” gibi kelime kullanma."],
+  ["sosyal gorsel", "Sosyal görsel",
+   "Gönderi fotoğrafı — ne görünsün, ne görünmesin",
+   "örnek: İnsan yüzü olmasın. Sabah ışığı tercih et, gece sahnesi kullanma."],
+  ["blog", "Blog",
+   "Yazının kendisi — üslup ve yaklaşım",
+   "örnek: İlk paragrafta fiyat geçmesin. Her yazıda en az bir “ne zaman gitmemeli” uyarısı olsun."]
+];
+
+function talAnahtar(s){
+  const tr = {"ç":"c","ğ":"g","ı":"i","ö":"o","ş":"s","ü":"u",
+              "Ç":"c","Ğ":"g","İ":"i","Ö":"o","Ş":"s","Ü":"u"};
+  return (s || "").replace(/[çğıöşüÇĞİÖŞÜ]/g, c => tr[c])
+    .trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/* Motordaki engine/talimat.py ile AYNI kural: basliktan onceki metin
+   hicbir bolume girmiyor, boylece dosyanin basindaki not isteme sizmiyor. */
+function talCozumle(metin){
+  const out = {};
+  let aktif = "";
+  (metin || "").split("\n").forEach(l => {
+    const m = l.match(/^\s{0,3}#{1,6}\s+(.*?)\s*$/);
+    if (m) { aktif = talAnahtar(m[1]); out[aktif] = out[aktif] || []; return; }
+    if (aktif) out[aktif].push(l);
+  });
+  const r = {};
+  for (const k in out) r[k] = out[k].join("\n").trim();
+  return r;
+}
+
+function talId(anahtar){ return "tal_" + anahtar.replace(/ /g, "_"); }
+
+async function talimatKaydet(){
+  const parcalar = [];
+  for (const [anahtar, baslik] of TAL_BOLUM){
+    const el = $(talId(anahtar));
+    const v = ((el && el.value) || "").trim();
+    if (v) parcalar.push("## " + baslik + "\n\n" + v);
+  }
+  const metin = parcalar.length
+    ? "<!-- Panelden yazildi. Motor bu talimatlari her uretimde isteme ekler.\n"
+      + "     Sert kurallari kaldirmaz: uydurma rakam yasagi ve kalite kapisi\n"
+      + "     bu talimattan sonra da calisir. -->\n\n"
+      + parcalar.join("\n\n") + "\n"
+    : "";
+  try {
+    await putRaw("data/" + S.cur + "/talimat.md", metin,
+                 "panel: " + S.cur + " talimatlari guncellendi");
+    toast(parcalar.length
+      ? "Talimat kaydedildi — bir sonraki turdan itibaren geçerli"
+      : "Talimatlar temizlendi");
+    await load();
+  } catch(e){ toast("Kaydedilemedi: " + e.message); }
+}
+
+function talimatKutusu(s){
+  const b = talCozumle(s.talimat || "");
+  const alanlar = TAL_BOLUM.map(([anahtar, baslik, aciklama, ornek]) => `
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:3px">${esc(baslik)}</label>
+      <div class="sub" style="margin-bottom:7px">${esc(aciklama)}</div>
+      <textarea id="${talId(anahtar)}" rows="4" placeholder="${esc(ornek)}"
+        style="width:100%;padding:10px 12px;border:1px solid var(--line);
+               border-radius:9px;background:var(--raised);color:var(--ink);
+               font:inherit;font-size:13px;line-height:1.6;resize:vertical"
+        >${esc(b[anahtar] || "")}</textarea>
+    </div>`).join("");
+  return `<div class="panelbox" style="margin-top:0">
+    <header><h2>Bu sitenin kendi talimatları</h2><span class="sp"></span>
+      <span class="hint">${esc(s.domain)}</span></header>
+    <div style="padding:15px 17px">
+      <p class="sub" style="margin:0 0 14px">Buraya yazdıkların her üretimde
+        motorun istemine ekleniyor — kendi cümlelerinle, madde madde.
+        Aşağıdaki standartlar kodda yaşıyor ve buradan değişmiyor;
+        talimat onların <b>üzerine</b> değil, <b>yanına</b> yazılır.</p>
+      ${alanlar}
+      <button class="btn pri" onclick="talimatKaydet()">${ico("check")}Talimatları kaydet</button>
+      <p class="sub" style="margin:12px 0 0">Kaldırılamayanlar: uydurma rakam,
+        fiyat ve ölçü yasağı · kalite kapısı · link ve uzunluk eşikleri ·
+        görselde fiyat yazmama kuralı. Bunlar talimattan sonra da çalışır,
+        yani “fiyat uydurabilirsin” yazmak yazıyı kapıdan geçirmez.</p>
+    </div></div>`;
+}
+
 function vStd(){
   const b=(baslik,maddeler)=>`<div class="panelbox">
     <header><h2>${baslik}</h2></header>
@@ -1598,7 +1692,9 @@ function vStd(){
       line-height:1.65;color:var(--ink)">`+
     maddeler.map(m=>`<li style="margin-bottom:7px">${m}</li>`).join("")+
     `</ul></div>`;
-  return `<div class="note">Bu ekran motorun uyduğu kuralların tam listesi.
+  const s=site();
+  return (s?talimatKutusu(s):"") +
+  `<div class="note">Bu ekran motorun uyduğu kuralların tam listesi.
     Kurallar kodda yaşıyor; burası ne karar verildiğini ve <em>neden</em>
     verildiğini gösteriyor.</div>` +
   b("Blog görselleri",[
