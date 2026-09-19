@@ -12,6 +12,13 @@
   --amber:#9a6a10; --amber-soft:#fbf1dd;
   --red:#a13a35; --red-soft:#fbe9e7;
   --blue:#2c5d8f; --blue-soft:#e8f0f8;
+  --ok:#0f7a3d; --ok-soft:#e8f4ec;
+  /* Sira bandi olcegi: TEK renkten dort adim, koyu = ilk sayfa.
+     Dort ayri renk (yesil/sari/turuncu/kirmizi) renk korlugunde sari ile
+     turuncuyu ayirt edilemez yapiyordu; sirali bir olcegin isi zaten tek
+     hue ile koyudan aciga gitmek. Iyi/kotu yargisini renk degil, yanindaki
+     "Gomulu" gostergesi ve metin tasiyor. */
+  --q1:#0e4a3e; --q2:#1a7a66; --q3:#3aa38c; --q4:#74c2af;
   --shadow:0 1px 2px rgba(20,22,26,.05), 0 4px 14px rgba(20,22,26,.04);
   --r:12px;
   color-scheme:light;
@@ -24,6 +31,8 @@
     --amber:#d9a441; --amber-soft:#2e2617;
     --red:#e0817b; --red-soft:#33201f;
     --blue:#7fb0e0; --blue-soft:#1a2632;
+  --ok:#4ac47e; --ok-soft:#14301f;
+  --q1:#7fd0b7; --q2:#4fb59b; --q3:#2e8a76; --q4:#1b5d4e;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
     color-scheme:dark;
   }
@@ -35,6 +44,8 @@
   --amber:#d9a441; --amber-soft:#2e2617;
   --red:#e0817b; --red-soft:#33201f;
   --blue:#7fb0e0; --blue-soft:#1a2632;
+  --ok:#4ac47e; --ok-soft:#14301f;
+  --q1:#7fd0b7; --q2:#4fb59b; --q3:#2e8a76; --q4:#1b5d4e;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
   color-scheme:dark;
 }
@@ -155,16 +166,20 @@ main{min-width:0}
 .hbanner .halt{font-size:12.5px;margin-top:4px;color:var(--ink-2);line-height:1.45}
 
 /* --- analitik --- */
-.scbar{display:flex;height:34px;border-radius:8px;overflow:hidden;background:var(--line-2)}
+.scbar{display:flex;height:34px;gap:2px}
+.scbar .scseg:first-child{border-radius:8px 3px 3px 8px}
+.scbar .scseg:last-child{border-radius:3px 8px 8px 3px}
 .scseg{display:flex;align-items:center;justify-content:center;min-width:2px;
-  font-size:11.5px;font-weight:600;color:#fff;overflow:hidden;white-space:nowrap}
-.scseg.g1{background:var(--brand)}.scseg.g2{background:#5b8f82}
-.scseg.g3{background:var(--amber)}.scseg.g4{background:var(--red)}
+  font-size:11.5px;font-weight:600;color:#fff;overflow:hidden;white-space:nowrap;
+  border-radius:3px}
+.scseg.g1{background:var(--q1)}.scseg.g2{background:var(--q2)}
+.scseg.g3{background:var(--q3)}.scseg.g4{background:var(--q4)}
+.scseg.g3,.scseg.g4{color:#08281f}
 .scleg{display:flex;flex-wrap:wrap;gap:16px;margin-top:11px;font-size:12px;color:var(--muted)}
 .scleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;
   vertical-align:-1px}
-.scleg i.g1{background:var(--brand)}.scleg i.g2{background:#5b8f82}
-.scleg i.g3{background:var(--amber)}.scleg i.g4{background:var(--red)}
+.scleg i.g1{background:var(--q1)}.scleg i.g2{background:var(--q2)}
+.scleg i.g3{background:var(--q3)}.scleg i.g4{background:var(--q4)}
 .scz{color:var(--red);font-weight:600}
 
 /* --- sosyal --- */
@@ -356,6 +371,24 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
   .asidefoot{display:none}
   .content,.topbar{padding-left:16px;padding-right:16px}
 }
+
+/* --- yazi performansi --- */
+.perfhero{display:flex;flex-wrap:wrap;gap:30px;padding:17px 17px 15px;
+  border-bottom:1px solid var(--line-2)}
+.perfhero .h{min-width:104px}
+.perfhero .hn{font-size:27px;font-weight:650;letter-spacing:-.03em;line-height:1}
+.perfhero .hn.ok{color:var(--ok)}
+.perfhero .hn.brand{color:var(--brand-ink)}
+.perfhero .hl{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+td.muteds{color:var(--muted)}
+.ptitle{font-weight:550;letter-spacing:-.01em;max-width:420px}
+.ptitle small{display:block;color:var(--muted);font-weight:400;font-size:11.5px;
+  margin-top:3px;letter-spacing:0}
+.pwait{color:var(--muted);font-size:12.5px}
+.pbar{display:block;height:4px;border-radius:2px;background:var(--q2);
+  margin:6px 0 0 auto;min-width:3px}
+
 </style>
 </head>
 <body>
@@ -626,6 +659,93 @@ function render(){
    değil. Burada ölçüm Google'ın kendi verisi: kaç kez göründük, kaç kez
    tıklandık, kaçıncı sıradayız. Rakamlar süslenmiyor — bu sitenin arama
    görünürlüğü şu an neredeyse yok ve ekran bunu saklamıyor. */
+/* ===================== yazi performansi =====================
+   "Bu yapinin yayinladigi yazi ne getirdi" sorusunun cevabi. Search Console
+   rakamlari yazinin kendi satirinda: gosterim, tiklama, sira.
+
+   Olculmemis yazi 0 GOSTERMIYOR. Uc gun once cikmis bir yazinin yaninda "0"
+   yazmak, calismadigini soylemek olur; oysa Google o yaziyi daha yeni
+   goruyor. "Olcum bekliyor" ile "gosterilmedi" ayri seyler ve ayri
+   yaziliyor. */
+function vPerf(s, d){
+  const yazilar = (s.published || []);
+  if(!yazilar.length) return "";
+  const kayit = {};
+  (d.articles || []).forEach(a => { if(a && a.url) kayit[a.url] = a; });
+  const katmanYok = !(d.articles || []).length;
+
+  const satir = yazilar.map(p => {
+    const a = kayit[p.url] || null;
+    return { p, gun: gunFarki(p.date),
+             g: (a && a.impressions) || 0,
+             t: (a && a.clicks) || 0,
+             sira: (a && a.position != null) ? a.position : null };
+  }).sort((x, y) => (y.g - x.g) ||
+          String(y.p.date || "").localeCompare(String(x.p.date || "")));
+
+  const enCok  = Math.max(1, ...satir.map(x => x.g));
+  const topG   = satir.reduce((n, x) => n + x.g, 0);
+  const topT   = satir.reduce((n, x) => n + x.t, 0);
+  const olculen = satir.filter(x => x.g > 0).length;
+  const don = (d.articles || [])[0] || {};
+  const donem = don.measured_to
+    ? esc(String(don.measured_from || "")) + " → " + esc(String(don.measured_to))
+    : "ilk ölçüm bekleniyor";
+
+  const hero = '<div class="perfhero">'
+    + '<div class="h"><div class="hn brand">' + nf(topG) + '</div>'
+    + '<div class="hl">gösterim — aramada kaç kez çıktı</div></div>'
+    + '<div class="h"><div class="hn ok">' + nf(topT) + '</div>'
+    + '<div class="hl">tıklama — siteye giren kişi</div></div>'
+    + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
+    + '<div class="hl">yayınlanan yazı</div></div>'
+    + '<div class="h"><div class="hn">' + nf(olculen) + '</div>'
+    + '<div class="hl">ölçüm veren yazı</div></div>'
+    + '</div>';
+
+  const govde = satir.map(x => {
+    const p = x.p;
+    const yas = x.gun === null ? "" :
+      (x.gun === 0 ? "bugün" : x.gun === 1 ? "dün" : x.gun + " gün önce");
+    const dil = cevSay(p);
+    const seo = (p.seo_score != null) ? Math.round(p.seo_score) : "—";
+    const ad = '<td class="ptitle"><a href="' + esc(p.url || "#")
+      + '" target="_blank" rel="noopener">' + esc(p.title || p.slug || "?") + '</a>'
+      + '<small>' + esc(yas) + (dil ? " · " + dil + " dil" : "") + '</small></td>';
+    if(x.g > 0){
+      const w = Math.max(3, Math.round(x.g * 100 / enCok));
+      return '<tr>' + ad
+        + '<td class="n">' + nf(x.g)
+        + '<span class="pbar" style="width:' + w + '%"></span></td>'
+        + '<td class="n">' + (x.t ? nf(x.t) : '<span class="scz">0</span>') + '</td>'
+        + '<td class="n muteds">' + (x.sira != null ? x.sira.toFixed(1) : "—") + '</td>'
+        + '<td class="n">' + seo + '</td></tr>';
+    }
+    const sebep = katmanYok
+      ? "ölçüm katmanı bir sonraki Search Console turunda devreye girecek"
+      : (x.gun !== null && x.gun < 10)
+        ? "ölçüm bekliyor — Google yeni yazıyı yaklaşık bir hafta sonra göstermeye başlar"
+        : "bu dönemde aramada hiç gösterilmedi";
+    return '<tr>' + ad + '<td colspan="3" class="pwait">' + esc(sebep) + '</td>'
+      + '<td class="n">' + seo + '</td></tr>';
+  }).join("");
+
+  const tablo = '<div class="tw"><table><thead><tr><th>Yazı</th>'
+    + '<th class="n">Gösterim</th><th class="n">Tıklama</th>'
+    + '<th class="n">Sıra</th><th class="n">SEO</th></tr></thead>'
+    + '<tbody>' + govde + '</tbody></table></div>';
+
+  const not = '<p class="note">Bu sayılar yalnızca <b>Google aramasından</b> geleni '
+    + 'ölçer. Instagram ve Facebook’tan gelen ziyaretçi Search Console’da '
+    + 'görünmez — onu ayırmak için siteye Analytics kurulması gerekir, bu yapı '
+    + 'onu kurmuyor. Çevirisi olan yazıda bütün dillerin rakamları tek satırda '
+    + 'toplanıyor.</p>';
+
+  return '<div class="panelbox"><header><h2>Yazı performansı</h2>'
+    + '<span class="sp"></span><span class="hint">' + donem + '</span></header>'
+    + hero + tablo + not + '</div>';
+}
+
 function vSC(){
   const s=site(); if(!s) return empty("chart","Site yok","");
   const d=s.sc;
@@ -701,7 +821,7 @@ function vSC(){
         onlar lokasyon sayfası işi, blog konusu değil.`:""}
     </div></div>`;
 
-  return tiles+dagilim+firsat+sayfalar+not;
+  return tiles+dagilim+vPerf(s,d)+firsat+sayfalar+not;
 }
 
 /* ===================== sosyal medya =====================
