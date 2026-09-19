@@ -381,12 +381,12 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
 .perfhero .hn.brand{color:var(--brand-ink)}
 .perfhero .hl{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
-td.muteds{color:var(--muted)}
+.muteds{color:var(--muted)}
 .ptitle{font-weight:550;letter-spacing:-.01em;max-width:420px}
 .ptitle small{display:block;color:var(--muted);font-weight:400;font-size:11.5px;
   margin-top:3px;letter-spacing:0}
 .pwait{color:var(--muted);font-size:12.5px}
-.pbar{display:block;height:4px;border-radius:2px;background:var(--q2);
+.pbar{display:block;height:4px;border-radius:2px;background:var(--q2);max-width:88px;
   margin:6px 0 0 auto;min-width:3px}
 
 </style>
@@ -694,9 +694,9 @@ function vPerf(s, d){
 
   const hero = '<div class="perfhero">'
     + '<div class="h"><div class="hn brand">' + nf(topG) + '</div>'
-    + '<div class="hl">gösterim — aramada kaç kez çıktı</div></div>'
+    + '<div class="hl">gösterim<br>aramada kaç kez çıktı</div></div>'
     + '<div class="h"><div class="hn ok">' + nf(topT) + '</div>'
-    + '<div class="hl">tıklama — siteye giren kişi</div></div>'
+    + '<div class="hl">tıklama<br>siteye giren kişi</div></div>'
     + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
     + '<div class="hl">yayınlanan yazı</div></div>'
     + '<div class="h"><div class="hn">' + nf(olculen) + '</div>'
@@ -717,15 +717,15 @@ function vPerf(s, d){
       return '<tr>' + ad
         + '<td class="n">' + nf(x.g)
         + '<span class="pbar" style="width:' + w + '%"></span></td>'
-        + '<td class="n">' + (x.t ? nf(x.t) : '<span class="scz">0</span>') + '</td>'
+        + '<td class="n">' + (x.t ? nf(x.t) : (x.g >= 100 ? '<span class="scz">0</span>' : '<span class="muteds">0</span>')) + '</td>'
         + '<td class="n muteds">' + (x.sira != null ? x.sira.toFixed(1) : "—") + '</td>'
         + '<td class="n">' + seo + '</td></tr>';
     }
     const sebep = katmanYok
-      ? "ölçüm katmanı bir sonraki Search Console turunda devreye girecek"
+      ? "ölçüm katmanı bekliyor"
       : (x.gun !== null && x.gun < 10)
-        ? "ölçüm bekliyor — Google yeni yazıyı yaklaşık bir hafta sonra göstermeye başlar"
-        : "bu dönemde aramada hiç gösterilmedi";
+        ? "ölçüm bekliyor"
+        : "aramada gösterilmedi";
     return '<tr>' + ad + '<td colspan="3" class="pwait">' + esc(sebep) + '</td>'
       + '<td class="n">' + seo + '</td></tr>';
   }).join("");
@@ -735,7 +735,7 @@ function vPerf(s, d){
     + '<th class="n">Sıra</th><th class="n">SEO</th></tr></thead>'
     + '<tbody>' + govde + '</tbody></table></div>';
 
-  const not = '<p class="note">Bu sayılar yalnızca <b>Google aramasından</b> geleni '
+  const not = '<p class="note">Yeni bir yazı Google’da yaklaşık bir hafta sonra görünmeye başlar; o zamana kadar satırda <b>ölçüm bekliyor</b> yazar — sıfır değil. Bu sayılar yalnızca <b>Google aramasından</b> geleni '
     + 'ölçer. Instagram ve Facebook’tan gelen ziyaretçi Search Console’da '
     + 'görünmez — onu ayırmak için siteye Analytics kurulması gerekir, bu yapı '
     + 'onu kurmuyor. Çevirisi olan yazıda bütün dillerin rakamları tek satırda '
