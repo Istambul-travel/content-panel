@@ -384,8 +384,8 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
   border-bottom:1px solid var(--line-2)}
 .perfhero .h{min-width:104px}
 .perfhero .hn{font-size:27px;font-weight:650;letter-spacing:-.03em;line-height:1}
-.perfhero .hn.ok{color:var(--ok)}
-.perfhero .hn.brand{color:var(--brand-ink)}
+.perfhero .hn.iyi{color:var(--ok)}
+.perfhero .hn.acc{color:var(--brand-ink)}
 .perfhero .hl{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
 .muteds{color:var(--muted)}
@@ -705,9 +705,9 @@ function vPerf(s, d){
       + 'Yukarıdaki site toplamları sitenin bütün sayfalarını kapsar; buradaki rakamlar '
       + 'yalnızca bu yapının yayınladığı yazılar için.</p>'
     : '<div class="perfhero">'
-    + '<div class="h"><div class="hn brand">' + nf(topG) + '</div>'
+    + '<div class="h"><div class="hn acc">' + nf(topG) + '</div>'
     + '<div class="hl">gösterim</div></div>'
-    + '<div class="h"><div class="hn ok">' + nf(topT) + '</div>'
+    + '<div class="h"><div class="hn iyi">' + nf(topT) + '</div>'
     + '<div class="hl">tıklama — siteye giren</div></div>'
     + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
     + '<div class="hl">yayınlanan yazı</div></div>'
