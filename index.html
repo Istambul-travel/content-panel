@@ -380,7 +380,7 @@ code{background:var(--line-2);padding:1.5px 6px;border-radius:5px;font-size:12.5
 }
 
 /* --- yazi performansi --- */
-.perfhero{display:flex;flex-wrap:wrap;gap:30px;padding:17px 17px 15px;
+.perfhero{display:flex;flex-wrap:wrap;align-items:flex-start;gap:34px;padding:17px 17px 15px;
   border-bottom:1px solid var(--line-2)}
 .perfhero .h{min-width:104px}
 .perfhero .hn{font-size:27px;font-weight:650;letter-spacing:-.03em;line-height:1}
@@ -699,11 +699,16 @@ function vPerf(s, d){
     ? esc(String(don.measured_from || "")) + " → " + esc(String(don.measured_to))
     : "ilk ölçüm bekleniyor";
 
-  const hero = '<div class="perfhero">'
+  const hero = (olculen === 0)
+    ? '<p class="note" style="border-bottom:1px solid var(--line-2)">Yayınlanan <b>'
+      + yazilar.length + '</b> yazının henüz hiçbiri ölçüm vermedi — hepsi yeni çıktı. '
+      + 'Yukarıdaki site toplamları sitenin bütün sayfalarını kapsar; buradaki rakamlar '
+      + 'yalnızca bu yapının yayınladığı yazılar için.</p>'
+    : '<div class="perfhero">'
     + '<div class="h"><div class="hn brand">' + nf(topG) + '</div>'
-    + '<div class="hl">gösterim<br>aramada kaç kez çıktı</div></div>'
+    + '<div class="hl">gösterim</div></div>'
     + '<div class="h"><div class="hn ok">' + nf(topT) + '</div>'
-    + '<div class="hl">tıklama<br>siteye giren kişi</div></div>'
+    + '<div class="hl">tıklama — siteye giren</div></div>'
     + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
     + '<div class="hl">yayınlanan yazı</div></div>'
     + '<div class="h"><div class="hn">' + nf(olculen) + '</div>'
