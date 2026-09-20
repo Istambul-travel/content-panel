@@ -1,0 +1,367 @@
+# istanbulhamam.com — ikinci site
+#
+# 16.09.2026'da kuruldu. Evren: "ikinci siteyi actigimizda o siteye dair
+# bilgileri nasil verecegiz, altyapiyi nasil kuracagiz bilmiyorum.
+# istanbulhamam.com'dan baslayalim bence."
+#
+# BU SITE ISTAMBUL.COM'UN KOPYASI DEGIL. Iki temel fark:
+#   1. Portal degil, MARKA sitesi. istambul.com affiliate + kendi markalarina
+#      trafik tasiyor; burasi kendi urununu satiyor (WooCommerce + Stripe).
+#      Yazinin isi ziyaretciyi rezervasyona goturmek.
+#   2. ALTI DILLI. Polylang ile EN/DE/ES/FR/RU/ZH. istambul.com tek dilli.
+#
+# Ilk tur SHADOW modda: uretiyor, kuyruga yaziyor, YAYINLAMIYOR. Cikti
+# kontrol edildikten sonra mode: live yapilacak.
+slug: istanbulhamam
+domain: istanbulhamam.com
+language: en
+timezone: Europe/Istanbul
+enabled: true
+
+mode: live
+
+wordpress:
+  api_base: https://istanbulhamam.com/wp-json/wp/v2
+  user_env: WP_USER_ISTANBULHAMAM
+  app_password_env: WP_APPPASS_ISTANBULHAMAM
+  # Uygulama parolasi Evren'in kullanicisina ait ama yazilar sitenin kendi
+  # imzasiyla cikmali: mevcut 507 yazinin hepsi "Istanbul Hamam" (id 1)
+  # yazarinda. Imza degisirse arsiv ikiye bolunur.
+  author_id: 1
+  status: publish
+
+  # 16.09.2026 — TAKSONOMİ BURADA DURUYOR, "seo:" altında DEĞİL.
+  # İlk yazımda seo: altına koymuştum; publish_wp bunları
+  # site.raw["wordpress"] içinde arıyor ve bulamayınca yazı üretildikten
+  # SONRA yayın adımında "target_categories tanımlı değil" diye düşüyordu.
+  # Yani model yazıyı yazmış, para harcanmış, yayın olmamıştı.
+  # TAKSONOMI — sitenin MEVCUT kategorileri kullaniliyor, yenisi acilmiyor.
+  # Tek istisna asagida.
+  #
+  # Olculen durum (16.09.2026): 507 yazinin 354'u "General" icinde. Bu
+  # istambul.com'daki ayni hastalik. Evren'in karari: yeni yazilar dogru
+  # kategoriye gitsin, mevcut 507 yaziya DOKUNULMASIN.
+  #
+  # Sitenin kategorileri hamam TURUNU anlatiyor (Historical, Luxury,
+  # Family-Friendly...). Ama yazilarin cogu pratik rehber: ne giyilir, bahsis
+  # ne kadar, ilk kez gidene ne olur. Bunlarin yeri yoktu — 354 yazinin
+  # "General"a yigilmasinin sebebi bu. TEK yeni kategori aciliyor:
+  # "Hamam Guide". Bu bir demo kabugu degil, gercek bir bosluk.
+  taxonomy_rebuilt: 2026-09-16
+  default_category: hamam-guide
+  target_categories:
+    - {name: "Historical Hamams", slug: "historical-hamams",
+       match: [cemberlitas, cagaloglu, hurrem sultan, suleymaniye, kilic ali,
+               mihrimah, ottoman, historic, 16th century, sinan, heritage]}
+    - {name: "Luxury Hamams", slug: "luxury-hamams",
+       match: [luxury, five star, 5 star, private suite, couples, vip,
+               premium, hotel spa, ritz, four seasons]}
+    - {name: "Family-Friendly Hamams", slug: "family-friendly-hamams",
+       match: [family, children, kids, with children, mixed gender,
+               separate sections, women only, men only]}
+    - {name: "Spa & Wellness Hamams", slug: "spa-wellness-hamams",
+       match: [spa, wellness, massage, aromatherapy, sauna, steam room,
+               treatment, relaxation, skin]}
+    - {name: "Popular Hamams", slug: "popular-hamams",
+       match: [best hamam, top hamam, popular, most visited, near sultanahmet,
+               near taksim, beyoglu, kadikoy, galata]}
+    - {name: "Historical Landmarks", slug: "historical-landmarks",
+       match: [hagia sophia, blue mosque, topkapi, grand bazaar, basilica
+               cistern, galata tower, bosphorus, landmark]}
+    # Pratik rehberler — 16.09.2026'da acildi, sebebi yukarida.
+    - {name: "Hamam Guide", slug: "hamam-guide",
+       match: [what to wear, what to expect, etiquette, tipping, how much,
+               first time, worth it, walk in, book ahead, how long, kese,
+               scrub, foam, towel, peshtemal, guide, tips, before you go]}
+
+# -----------------------------------------------------------------------------
+# GORSELLER — istambul.com ile ayni kademe: gercek foto -> AI foto -> grafik.
+# Hamam konusu AI gorselinde HASSAS: "bath / spa / massage" kelimeleri
+# guvenlik suzgecini tetikliyor (13.09.2026'da bir hamam yazisi reddedildi).
+# engine/photo.py bu konularda istemi mimariye daraltiyor: bos mermer, buhar,
+# isik, bakir tas, hic insan yok.
+
+# -----------------------------------------------------------------------------
+# COK DILLILIK — bu sitenin istambul.com'da olmayan yani
+#
+# Karar (Evren, 15.09.2026): "6 dilin hepsi".
+#
+# Sitede zaten boyle calisiyor: ayni yazi 6 ayri WordPress yazisi, ayni tarih
+# ve saatte, Polylang ile birbirine bagli. 507 yazinin buyuk kismi bu.
+#
+# TEKNIK ENGEL: Polylang'in UCRETSIZ surumu REST'te dil alanini acmiyor.
+# /wp/v2/posts cevabinda lang alani gelmiyor ve ?lang=fr filtresi calismiyor
+# (16.09.2026'da olculdu, Ingilizce yazilar donuyor).
+#
+# ELIMIZDEKI ANAHTAR: temanin kendi REST katmani — mb/v1 ad alani,
+# markention-hamam temasi tarafindan aciliyor:
+#     POST /wp-json/mb/v1/link-translations
+#     POST /wp-json/mb/v1/translate-term
+# Uclar dokumansiz; imzalari tema kodundan cikarilacak.
+#
+# translations.enabled FALSE baslar. Once Ingilizce yayin dogru calissin,
+# sonra ceviri katmani acilsin. Yarim calisan ceviri, arama motorunda
+# birbirine baglanmamis kopya sayfalar demek — hic olmamasindan kotu.
+translations:
+  # DEVREDE — 16.09.2026. Motor tarafi: engine/translate.py.
+  # Ingilizce yazi yayinlandiktan sonra her dil icin AYRI model cagrisi
+  # yapiliyor, her ceviri ayri bir WordPress yazisi olarak aciliyor ve
+  # hepsi link_endpoint uzerinden Polylang'da birbirine baglaniyor.
+  #
+  # 16.09.2026 tek dille (de) canli dogrulandi: Almanca surum ayni yapiyla
+  # cikti (6 h2, 21 p, 7 link, ayni href'ler), /de/ onekiyle yayinlandi ve
+  # Polylang'da Ingilizceye baglandi. Ardindan bes dile acildi.
+  #
+  # Bir dil duserse yalnizca o dil atlanir; Ingilizce yazi ve oteki diller
+  # etkilenmez. Yarim ceviri (ozetlenmis govde, kesik cevap) yayinlanmiyor.
+  enabled: true
+  default: en
+  languages: [de, es, fr, ru, zh]
+  provider: anthropic
+  # Ceviri modeli. Bos birakilirsa global utility modeli kullaniliyor.
+  # Yazi basina dil basina kabaca 0,018 USD.
+  model: ""
+  link_endpoint: /wp-json/mb/v1/link-translations
+
+# -----------------------------------------------------------------------------
+images:
+  enabled: true
+  provider: generated
+  real_photo_first: true
+  ai_photo: true
+  token_env: OPENAI_API_KEY
+  per_article: 3
+  width: 1200
+  hero_size: [1200, 630]
+  language: en
+
+# -----------------------------------------------------------------------------
+# URL YAPISI — DEGISTIRILMEYECEK.
+# Site /%postname%/ yapisinda ve 507 yazi bu adreslerde. istambul.com'da
+# 10.09.2026'da /blog/ oneki denendi ve 199 sayfayi 404'e dusurdu. Ayni hatayi
+# 507 yazilik bir sitede yapmanin bedeli daha da buyuk.
+permalink:
+  structure: "/%postname%/"
+
+# -----------------------------------------------------------------------------
+schedule:
+  posts_per_week: 3
+  days: [monday, wednesday, friday]
+  publish_time: "09:00"
+  ramp_up: {week_4: 4}
+
+# -----------------------------------------------------------------------------
+# SOSYAL — AYRI HESAP. Portal hesabindan (@istambulguide) farkli.
+# Evren, 15.09.2026: "Ayri bir hesap var" — @istanbulhammam
+# (136 gonderi, 1.974 takipci, bio'da www.istanbulhamam.com).
+#
+# DIKKAT: yazimi "hammam" (cift m), alan adi ise "hamam" (tek m). Karistirmak
+# yayini sessizce yanlis hesaba gonderir.
+#
+# instagram_user_id ve facebook_page_id BOS. Elle tahmin edilmiyor —
+# run_social.py --discover ile token'a sorulup buraya yazilacak. En sik
+# yapilan kurulum hatasi kimlik tahmin etmek.
+social:
+  instagram_handle: istanbulhammam
+  facebook_page: istanbulhammam
+  provider: meta
+  # ONAY MODU. true ise gonderi uretiliyor, gorseli hazirlaniyor ama
+  # YAYINLANMIYOR: panelde "Onay ve duzelt" ekraninda "ready" olarak
+  # bekliyor. Orada metnini degistirip onaylayabilir ya da reddedebilirsin;
+  # onayladigin gonderi bir sonraki sosyal turda cikiyor. Onay sonrasi
+  # yayin model cagrisi yapmiyor, ek maliyeti yok.
+  # false ise gonderi uretildigi anda cikiyor (varsayilan calisma bicimi).
+  approval: false
+  posts_per_week: 3
+  # 16.09.2026: hesap is portfoyune eklendi (kisisel -> Isletme donusumu yapildi)
+  # ve sistem kullanicisina "Content + Insights" yetkisiyle atandi. Kimlik Meta
+  # Business ayarlarindan OKUNDU, tahmin edilmedi.
+  instagram_user_id: "17841464705428913"
+  # FACEBOOK YOK — KAPANMIS KARAR (Evren, 16.09.2026: "hamamin facebook
+  # sayfasini acmayacagiz"). Bu bir eksik degil, bir tercih: hamam markasi
+  # yalnizca Instagram'da yasiyor. Bos birakilan facebook_page_id motorun
+  # Facebook adimini her turda sessizce atlatiyor, hata basmiyor.
+  # BU SATIRI DOLDURMAYIN. Doldurulursa motor var olmayan bir sayfaya
+  # yayin denemeye baslar.
+  facebook_page_id: ""
+  business_id: "287905324376170"
+  app_id: "1067225642770229"
+  token_env: META_ACCESS_TOKEN
+  # TASARIM — bu blok hesabin KENDI gonderilerinden doldurulacak, simdilik
+  # marka renginin bilinen degeri duruyor (istambul.com'daki brand_accent
+  # tablosunda hamam altin #c9972f olarak kayitli).
+  # Hesabin son gonderileri incelenmeden layout kesinlestirilmeyecek.
+  design:
+    accent: "#c9972f"
+    paper: "#f4efe4"
+    # DUZ: hesabin 136 gonderisi incelendi, HEPSI duz fotograf — yazi yok,
+    # kart yok, marka kilidi yok. Bilgiyi caption tasiyor. istambul.com'un
+    # dort duzenli kart kurgusu buraya TASINMIYOR.
+    layout: duz
+    wordmark: istanbulhamam.com
+    brand_accent:
+      istanbulhamam: "#c9972f"
+      istanbulturkishbath: "#c9972f"
+  locations:
+    cemberlitas: "1005121022"
+    cagaloglu: "1005121022"
+    sultanahmet: "1005121022"
+    hurrem sultan: "1005121022"
+    grand bazaar: "213264762"
+  location_default: "114008537024577"
+  # Portal degil marka sitesi: her gonderi o gun cikan yazidan. Lokasyon ve
+  # mevsimlik doldurucu yok — 199 lokasyon sayfasi bu sitede yok.
+  mix:
+    article_derived: 3
+    location_spotlight: 0
+    seasonal_practical: 0
+  require_real_photo: false
+
+# -----------------------------------------------------------------------------
+
+search_console:
+  # ANAHTAR KELIMELER BURADAN GELIYOR. Her sitenin kendi mulku ayri ayri
+  # sorgulaniyor; ortak olan tek sey servis hesabi anahtari.
+  #
+  # 16.09.2026'ya kadar veri Site Kit uzerinden TARAYICIDAN cekiliyordu:
+  # Site Kit sunucudan gelen isteklere Google verisini vermiyor
+  # ("missing_required_scopes"). Artik Google'in kendi API'si kullaniliyor
+  # ve sunucudan calisiyor.
+  #
+  # Mulk turu onemli: sc-domain:<alan> (Domain property) ile https://<alan>/
+  # (URL-prefix) Google icin AYRI kayitlar, biri otekinin verisini vermiyor.
+  # OLCULDU 17.09.2026: portfoydeki butun mulkler URL-PREFIX bicimde
+  # (https://<alan>/), Domain property degil. sc-domain: yazilirsa Google
+  # 404 donuyor — ikisi ayri kayit.
+  property: https://istanbulhamam.com/
+  service_account_env: GSC_SERVICE_ACCOUNT_JSON
+business:
+  what_it_is: >
+    Istanbul's historic Turkish baths, sold direct. The site lists the city's
+    hamams — Ottoman bathhouses still working after four centuries alongside
+    modern spa hamams — and sells the visit online with instant confirmation.
+  primary_city: Istanbul, Turkiye
+  # istambul.com hibrit (affiliate + kendi markalari). BURASI FARKLI:
+  # gelir dogrudan. Yazinin gorevi affiliate tiklamasi degil, rezervasyon.
+  monetisation: direct
+  rule: >
+    Every article ends in a decision the reader can act on: which hamam suits
+    them, what it costs in time, what to bring, what happens in what order.
+    Never an affiliate link to a competitor marketplace. The booking is ours.
+
+# -----------------------------------------------------------------------------
+link_map:
+  # SIRA ONEMLI — ilk eslesen marka kazaniyor. Genel terimleri ("boat tour")
+  # tutan marka en sona yaziliyor, yoksa "halic boat tour" Golden Horn yerine
+  # Bosporus a gidiyor.
+  own_brands:
+    - {name: "Istanbul Turkish Bath", url: "https://istanbulturkishbath.com",
+       match: [turkish bath experience]}
+    - {name: "Istanbul Hamam", url: "https://istanbulhamam.com",
+       match: [hamam, hammam, hamami, turkish bath, baths, bath house,
+               cemberlitas, cagaloglu, hurrem sultan, kese, scrub,
+               foam massage, peshtemal]}
+    - {name: "Camlica Tower", url: "https://camlicatower.com",
+       match: [camlica, camlica tower, observation deck]}
+    - {name: "Cistern of Theodosius", url: "https://cisternoftheodosius.com",
+       match: [serefiye, theodosius, cistern]}
+    - {name: "Golden Horn Cruise", url: "https://goldenhorncruise.com",
+       match: [golden horn, halic]}
+    - {name: "Bosporus Cruise", url: "https://bosporuscruise.com",
+       match: [bosphorus cruise, bosphorus, bosporus, boat tour, boat trip]}
+    - {name: "Istambul", url: "https://istambul.com",
+       match: [istanbul travel guide, things to do in istanbul, itinerary]}
+  post_sitemap: https://istanbulhamam.com/post-sitemap.xml
+  policy:
+    min_internal_links: 3
+    max_internal_links: 8
+    # Kendi urunumuzu satiyoruz: ticari link giriste degil, okuyucu neyi
+    # sectigini anladiktan SONRA.
+    commercial_link_in_intro: false
+
+# -----------------------------------------------------------------------------
+# 16.09.2026 — BU BLOK BİR KEZ YENİDEN YAZILDI.
+# İlk hâlinde ses tarifi "they have never undressed in a public bath" diyordu
+# ve yasak listesinde "bodies or skin", "voyeuristic" gibi kelimeler vardı.
+# Niyet doğruydu (metin asla müstehcen olmasın) ama bu kelimeler istemin
+# KENDİSİNİ tetikledi: model üç denemede de yazmayı reddetti
+# (stop_reason=refusal, 0 çıktı token). Kural aynı kaldı, dili nötrleştirildi.
+voice: >
+  Calm, specific and practical, the way a good concierge explains something
+  for the tenth time without sounding bored. Most readers have never been to
+  a hamam and do not know the sequence or the customs, so answer that
+  directly: name the rooms in order, say how long each part takes, say what
+  is provided and what to bring. Plain and factual, never florid. Respect for
+  a four-hundred-year-old building and for a reader who wants to arrive
+  knowing exactly what to do.
+
+structure: >
+  Open with the direct answer in the first two sentences. Then the sequence of
+  the visit, room by room, in order. Then the practical block: how long, what
+  to bring, what is provided, how to book. Close with the choice: which hamam
+  suits which reader. FAQ at the end, at least five questions, each a question
+  a first-time visitor really asks.
+
+audience: >
+  Foreign visitors to Istanbul, mostly first-timers, booking a few days ahead
+  from a phone. They are curious and want to know what to expect. They do not
+  read Turkish and do not know the customs. Many are couples; some are
+  families.
+
+avoid:
+  - Spa-brochure or florid language; this is a historic building and a routine, described plainly
+  - Health claims — a hamam is not a medical treatment
+  - Inventing prices, opening hours or durations
+  - Cliches like "hidden gem" or "must-see" or "unforgettable experience"
+  - Writing about the other visitors; the subject is the building, the ritual and the practicalities
+
+themes:
+  - The sequence of a visit, room by room
+  - Customs and what is expected of a visitor
+  - What to wear and what to bring
+  - Historic hamams and the architects who built them
+  - Choosing between a historic hamam and a modern spa hamam
+  - "Practical logistics: booking, timing, getting there, with children"
+
+# -----------------------------------------------------------------------------
+topic_scoring:
+  weights:
+    search_volume: 0.30
+    commercial_intent: 0.35
+    own_product_match: 0.20
+    gap: 0.15
+    # Geri donus yakinligi: sorguda kacinci siradayiz. 12. sirada bir yazi
+    # ilk sayfaya tasiyabilir, 63. sirada ayni yazi aylar surer. Search
+    # Console verisi olmayan adaylarda notr (0,50) sayiliyor.
+    payoff_proximity: 0.15
+  min_score_to_schedule: 0.45
+
+quality_gate:
+  min_words: 1100
+  max_words: 2200
+  require_faq_min: 5
+  min_seo_score: 75
+  max_similarity_to_existing: 0.72
+  fail_on:
+    - unverified_number
+    - missing_official_source
+    - internal_links_below_min
+    - broken_link
+    - banned_phrase
+    - duplicate_target_keyword
+    - commercial_link_in_intro
+  banned_phrases:
+    - "in today's fast-paced world"
+    - "nestled in the heart of"
+    - "hidden gem"
+    - "must-see"
+    - "whether you're a"
+    - "look no further"
+    - "unlock the secrets"
+    - "prices vary"
+    - "check the official website for"
+    - "delve into"
+    - "tapestry of"
+    - "sensual"
+    - "pamper yourself"
+    - "rejuvenate your soul"
