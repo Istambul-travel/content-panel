@@ -2225,7 +2225,7 @@ function vAdd(){
    +sat("naSlug","K&#305;sa ad &mdash; secret adlar&#305;nda kullan&#305;l&#305;r","turkishbath")
    +sat("naBrand","Marka ad&#305;","Istanbul Turkish Bath")
    +sat("naIg","Instagram kullan&#305;c&#305; ad&#305; (@ olmadan)","istanbulturkishbath")
-   +sat("naLayout","G&#246;rsel dili: duz (yaz&#305;s&#305;z foto&#287;raf) ya da auto (kartl&#305;)","duz","duz")
+   +sat("naDna","Site DNA&#39;s&#305; (STANDART 12) &mdash; kendi markalar&#305;m&#305;z: travelpedia &middot; m&#252;&#351;teri i&#231;in m&#252;&#351;terinin k&#305;sa ad&#305;. Kardes siteler ve &#351;ehir buradan gelir; bo&#351; b&#305;rak&#305;lamaz.","travelpedia")
    +sat("naAccent","Vurgu rengi","#c9972f","#c9972f")
    +sat("naWeek","Haftada ka&#231; yaz&#305;","3","3")
    +sat("naLang","&#304;&#231;erik dili","en","en")
@@ -2254,6 +2254,7 @@ async function siteOlustur(){
   var slug = (v("naSlug") || dom.split(".")[0]).toLowerCase().replace(/[^a-z0-9]/g,"");
   var out = $("naOut");
   if(!dom || dom.indexOf(".") < 0){ toast("Alan adi gerekli"); return; }
+  if(!/^[a-z0-9][a-z0-9-]{1,40}$/.test(v("naDna").toLowerCase())){ toast("DNA gerekli: kendi sitelerimiz icin travelpedia, musteri icin musterinin kisa adi"); return; }
   var b = $("naBtn"); b.disabled = true; b.textContent = "baslatiliyor...";
   try{
     await gh("/actions/workflows/add-site.yml/dispatches", {method:"POST",
@@ -2263,7 +2264,7 @@ async function siteOlustur(){
         language: v("naLang") || "en",
         brand_name: v("naBrand"),
         instagram: v("naIg").replace(/^@/,""),
-        layout: v("naLayout") || "duz",
+        dna: v("naDna").toLowerCase(),
         accent: v("naAccent") || "#c9972f",
         gsc_property: v("naGsc")
       }})});
