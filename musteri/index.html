@@ -157,7 +157,7 @@ const BUGUN = new Date().toISOString().slice(0, 10);
 
 function pill(durum) {
   const m = { "Yayımlandı": "p-ok", "Onaylandı": "p-ok", "Planlandı": "p-bek",
-              "Konu seçildi": "p-info",
+              "Konu seçildi": "p-info", "Taslak hazır": "p-bek",
               "İptal edildi": "p-mute", "Çıkmadı": "p-mute", "Silindi": "p-mute" };
   return '<span class="pill ' + (m[durum] || "p-mute") + '"><i></i>' + E(durum) + "</span>";
 }
@@ -277,8 +277,9 @@ function ekranTakvim() {
         '<div class="tag" style="color:' + (x.tur === "gonderi" ? "var(--purple-deep)" : "var(--slate)") + '">' +
         (x.tur === "gonderi" ? "GÖNDERİ" : "YAZI") + "</div>" +
         '<div class="ttl">' + E((x.baslik || "").slice(0, 46)) + "</div>" +
-        (x.duzenlenebilir ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + eylemler(x) + "</div>"
-                          : '<div>' + pill(x.durum) + "</div>")
+        '<div>' + pill(x.durum) + "</div>" +
+        (x.metin ? '<button class="bs" onclick="oku(\'' + E(x.gun) + '\')">Taslağı oku</button>' : "") +
+        (x.duzenlenebilir ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + eylemler(x) + "</div>" : "")
       ).join("") +
       (fazla > 0 ? '<div class="note" style="font-size:11px">+' + fazla + " daha</div>" : "") +
       "</div>";
@@ -409,6 +410,36 @@ window.isaretle = async function (ne, anahtar) {
       : "İşaretlendi — bir sonraki turda değişecek.");
     await yukle();
   } catch (e) { toast("Olmadı: " + e.message); }
+};
+
+// -------------------------------------------------------------- taslak okuma
+// Musteri metni YAYINDAN ONCE okuyor. Gorseller yayin gununde ekleniyor,
+// bu yuzden onizlemede yok — pencerenin altinda bunu yaziyoruz.
+window.oku = function (gun) {
+  const x = (D.takvim || []).find((t) => t.gun === gun && t.metin);
+  if (!x) return;
+  const k = document.createElement("div");
+  k.id = "okuma";
+  k.style.cssText = "position:fixed;inset:0;background:rgba(17,23,53,.42);" +
+    "display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;" +
+    "overflow:auto;z-index:50";
+  k.onclick = (ev) => { if (ev.target === k) k.remove(); };
+  k.innerHTML =
+    '<div class="card" style="max-width:760px;width:100%;background:#fff">' +
+    '<div class="pad" style="display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)">' +
+      '<div style="flex:1"><div class="lbl" style="font-size:12px;font-weight:600;letter-spacing:.07em;' +
+      'text-transform:uppercase;color:var(--slate-light)">' + tarih(x.gun) + " · taslak</div>" +
+      '<h3 style="font-size:19px;font-weight:700;margin-top:5px">' + E(x.baslik) + "</h3></div>" +
+      (x.seo != null ? '<div style="text-align:right"><div class="dsp" style="font-size:24px;font-weight:800;' +
+        'color:var(--purple-deep)">' + Math.round(x.seo) + '</div><div class="note">/100 kalite</div></div>' : "") +
+    "</div>" +
+    '<div class="pad" style="line-height:1.75;font-size:15px">' + x.metin + "</div>" +
+    '<div class="pad" style="border-top:1px solid var(--line);display:flex;align-items:center;gap:10px">' +
+      '<span class="note" style="flex:1">Görseller yayın günü ekleniyor. Bu metin kalite kapısından geçti.</span>' +
+      '<button class="br" onclick="isaretle(\'iptal\',\'konu|' + E(x.baslik) + "|" + x.gun + '\')">İptal</button>' +
+      '<button class="btn2" onclick="document.getElementById(\'okuma\').remove()">Kapat</button>' +
+    "</div></div>";
+  document.body.appendChild(k);
 };
 
 // ------------------------------------------------------------------- kabuk
