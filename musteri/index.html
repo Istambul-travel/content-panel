@@ -243,10 +243,14 @@ function eylemler(x) {
   // Iki ayri kayit turu: "konu" topics.json'da (henuz yazilmadi, iptal
   // BEDAVA), gonderi social.json'da (karesi cizildi, degistirilebilir).
   const tur = x.kayit === "konu" ? "konu" : "gonderi";
-  const k = tur + "|" + E(x.baslik) + "|" + x.gun;
+  const k = tur + "|" + E(x.konu || x.baslik) + "|" + x.gun;
   if (x.foto_degistir) return '<span class="pill p-info"><i></i>Fotoğraf değişecek</span>';
+  // ONAY MODU (blog.approval): taslak hazir ama musteri okumadan cikmiyor.
+  const onayla = x.onaylanabilir
+    ? '<button class="bs" onclick="isaretle(\'onay\',\'' + k + '\')">Yayınla</button>'
+    : "";
   const iptal = '<button class="br" onclick="isaretle(\'iptal\',\'' + k + '\')">İptal</button>';
-  if (tur === "konu") return iptal;
+  if (tur === "konu") return onayla + iptal;
   return '<button class="bs" onclick="isaretle(\'foto\',\'' + k + '\')">Fotoğrafı değiştir</button>' + iptal;
 }
 
@@ -388,7 +392,9 @@ function ekranBuyume() {
 window.isaretle = async function (ne, anahtar) {
   const [tur, baslik, gun] = anahtar.split("|");
   const konu = tur === "konu";
-  const soru = ne !== "iptal"
+  const soru = ne === "onay"
+    ? "Bu yazı yayınlansın mı? Onayladıktan sonra planlanan günde görsellerle birlikte çıkar."
+    : ne !== "iptal"
     ? "Fotoğrafı değiştirelim mi? Bir sonraki turda yeni kare çizilir, bu kare bir daha kullanılmaz."
     : konu
       ? "Bu konu iptal edilsin mi? Henüz yazılmadı, iptal etmek hiçbir şeye mal olmuyor."
@@ -402,10 +408,15 @@ window.isaretle = async function (ne, anahtar) {
       ? (p.topic || "") === baslik && String(p.scheduled_for || "").slice(0, 10) === gun
       : (p.subject || "") === baslik && String(p.scheduled_for || "").slice(0, 10) === gun);
     if (!k) { toast("Kayıt bulunamadı — sayfayı yenile"); return; }
-    if (ne === "iptal") k.iptal = true; else k.foto_degistir = true;
-    await yaz(yol, doc, (ne === "iptal" ? "musteri iptal etti: " : "musteri fotograf degistirdi: ") +
+    if (ne === "onay") k.onay = true;
+    else if (ne === "iptal") k.iptal = true;
+    else k.foto_degistir = true;
+    await yaz(yol, doc, (ne === "onay" ? "musteri onayladi: "
+                         : ne === "iptal" ? "musteri iptal etti: "
+                         : "musteri fotograf degistirdi: ") +
               baslik.slice(0, 40), sha);
-    toast(ne === "iptal"
+    toast(ne === "onay" ? "Onaylandı — planlanan günde yayımlanacak."
+      : ne === "iptal"
       ? (konu ? "İptal edildi — bu konu yazılmayacak." : "İptal edildi — çıkmayacak.")
       : "İşaretlendi — bir sonraki turda değişecek.");
     await yukle();
@@ -435,8 +446,15 @@ window.taslakOku = function (gun) {
     "</div>" +
     '<div class="pad" style="line-height:1.75;font-size:15px">' + x.metin + "</div>" +
     '<div class="pad" style="border-top:1px solid var(--line);display:flex;align-items:center;gap:10px">' +
-      '<span class="note" style="flex:1">Görseller yayın günü ekleniyor. Bu metin kalite kapısından geçti.</span>' +
-      '<button class="br" onclick="isaretle(\'iptal\',\'konu|' + E(x.baslik) + "|" + x.gun + '\')">İptal</button>' +
+      '<span class="note" style="flex:1">' +
+        (x.onaylanabilir
+          ? "Onayınızı bekliyor — onaylamazsanız yayımlanmaz. Görseller yayın günü ekleniyor."
+          : "Görseller yayın günü ekleniyor. Bu metin kalite kapısından geçti.") +
+      "</span>" +
+      (x.onaylanabilir
+        ? '<button class="btn" onclick="isaretle(\'onay\',\'konu|' + E(x.konu || x.baslik) + "|" + x.gun + '\')">Yayınla</button>'
+        : "") +
+      '<button class="br" onclick="isaretle(\'iptal\',\'konu|' + E(x.konu || x.baslik) + "|" + x.gun + '\')">İptal</button>' +
       '<button class="btn2" onclick="document.getElementById(\'okuma\').remove()">Kapat</button>' +
     "</div></div>";
   document.body.appendChild(k);
