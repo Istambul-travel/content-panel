@@ -82,7 +82,7 @@ main{flex:1;padding:26px 30px 60px;min-width:0}
 .cell.bugun{border-color:var(--purple)}
 .cell .no{font-size:11.5px;font-weight:700;color:var(--slate-light)}
 .cell.bugun .no{color:var(--purple-deep)}
-.thumb{width:100%;height:46px;border-radius:8px;object-fit:cover;background:var(--lilac);display:block}
+.thumb{width:100%;height:40px;border-radius:8px;object-fit:cover;background:var(--lilac);display:block}
 .tag{font-size:10px;font-weight:700;letter-spacing:.06em}
 .ttl{font-size:11.5px;font-weight:600;line-height:1.3}
 table{width:100%;border-collapse:collapse}
@@ -264,8 +264,12 @@ function ekranTakvim() {
   for (let i = 0; i < 35; i++) {
     const d = new Date(bas); d.setDate(bas.getDate() + i);
     const g = d.toISOString().slice(0, 10);
-    const liste = gunler[g] || [];
-    h += '<div class="cell' + (liste.length ? " dolu" : "") + (g === BUGUN ? " bugun" : "") + '">' +
+    const hepsi = gunler[g] || [];
+    // En fazla uc kayit: kalabalik bir gun butun haftayi asagi itiyordu.
+    // Gecmis gunlerde yayimlananlar ozetleniyor, gelecek gunler zaten seyrek.
+    const liste = hepsi.slice(0, 3);
+    const fazla = hepsi.length - liste.length;
+    h += '<div class="cell' + (hepsi.length ? " dolu" : "") + (g === BUGUN ? " bugun" : "") + '">' +
       '<div class="no">' + d.getDate() +
         (d.getDate() === 1 ? " " + AY[d.getMonth()].slice(0, 3) : "") + "</div>" +
       liste.map((x) =>
@@ -275,7 +279,9 @@ function ekranTakvim() {
         '<div class="ttl">' + E((x.baslik || "").slice(0, 46)) + "</div>" +
         (x.duzenlenebilir ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + eylemler(x) + "</div>"
                           : '<div>' + pill(x.durum) + "</div>")
-      ).join("") + "</div>";
+      ).join("") +
+      (fazla > 0 ? '<div class="note" style="font-size:11px">+' + fazla + " daha</div>" : "") +
+      "</div>";
   }
   h += "</div>";
   return '<div class="head"><div style="flex:1"><h1>Takvim</h1>' +
