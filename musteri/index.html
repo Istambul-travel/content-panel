@@ -157,6 +157,7 @@ const BUGUN = new Date().toISOString().slice(0, 10);
 
 function pill(durum) {
   const m = { "Yayımlandı": "p-ok", "Onaylandı": "p-ok", "Planlandı": "p-bek",
+              "Konu seçildi": "p-info",
               "İptal edildi": "p-mute", "Çıkmadı": "p-mute", "Silindi": "p-mute" };
   return '<span class="pill ' + (m[durum] || "p-mute") + '"><i></i>' + E(durum) + "</span>";
 }
@@ -239,10 +240,14 @@ function satir(x) {
 }
 
 function eylemler(x) {
-  const k = E(x.baslik) + "|" + x.gun;
+  // Iki ayri kayit turu: "konu" topics.json'da (henuz yazilmadi, iptal
+  // BEDAVA), gonderi social.json'da (karesi cizildi, degistirilebilir).
+  const tur = x.kayit === "konu" ? "konu" : "gonderi";
+  const k = tur + "|" + E(x.baslik) + "|" + x.gun;
   if (x.foto_degistir) return '<span class="pill p-info"><i></i>Fotoğraf değişecek</span>';
-  return '<button class="bs" onclick="isaretle(\'foto\',\'' + k + '\')">Fotoğrafı değiştir</button>' +
-         '<button class="br" onclick="isaretle(\'iptal\',\'' + k + '\')">İptal</button>';
+  const iptal = '<button class="br" onclick="isaretle(\'iptal\',\'' + k + '\')">İptal</button>';
+  if (tur === "konu") return iptal;
+  return '<button class="bs" onclick="isaretle(\'foto\',\'' + k + '\')">Fotoğrafı değiştir</button>' + iptal;
 }
 
 function ekranTakvim() {
@@ -370,21 +375,28 @@ function ekranBuyume() {
 // sonraki turda okuyor (engine/social.py -> iptal / foto_degistir).
 // Kayit SILINMIYOR: neyin neden cikmadigi gorunur kaliyor.
 window.isaretle = async function (ne, anahtar) {
-  const [baslik, gun] = anahtar.split("|");
-  const soru = ne === "iptal"
-    ? "Bu gönderi iptal edilsin mi? Yayına çıkmayacak."
-    : "Fotoğrafı değiştirelim mi? Bir sonraki turda yeni kare çizilir, bu kare bir daha kullanılmaz.";
+  const [tur, baslik, gun] = anahtar.split("|");
+  const konu = tur === "konu";
+  const soru = ne !== "iptal"
+    ? "Fotoğrafı değiştirelim mi? Bir sonraki turda yeni kare çizilir, bu kare bir daha kullanılmaz."
+    : konu
+      ? "Bu konu iptal edilsin mi? Henüz yazılmadı, iptal etmek hiçbir şeye mal olmuyor."
+      : "Bu gönderi iptal edilsin mi? Yayına çıkmayacak.";
   if (!confirm(soru)) return;
   try {
-    const yol = "data/" + SITE + "/social.json";
-    const [kuyruk, sha] = await oku(yol);
-    const k = (kuyruk.posts || []).find(
-      (p) => (p.subject || "") === baslik && String(p.scheduled_for || "").slice(0, 10) === gun);
+    const yol = "data/" + SITE + (konu ? "/topics.json" : "/social.json");
+    const [doc, sha] = await oku(yol);
+    const liste = konu ? (doc.topics || []) : (doc.posts || []);
+    const k = liste.find((p) => konu
+      ? (p.topic || "") === baslik && String(p.scheduled_for || "").slice(0, 10) === gun
+      : (p.subject || "") === baslik && String(p.scheduled_for || "").slice(0, 10) === gun);
     if (!k) { toast("Kayıt bulunamadı — sayfayı yenile"); return; }
     if (ne === "iptal") k.iptal = true; else k.foto_degistir = true;
-    await yaz(yol, kuyruk, (ne === "iptal" ? "musteri iptal etti: " : "musteri fotograf degistirdi: ") +
+    await yaz(yol, doc, (ne === "iptal" ? "musteri iptal etti: " : "musteri fotograf degistirdi: ") +
               baslik.slice(0, 40), sha);
-    toast(ne === "iptal" ? "İptal edildi — çıkmayacak." : "İşaretlendi — bir sonraki turda değişecek.");
+    toast(ne === "iptal"
+      ? (konu ? "İptal edildi — bu konu yazılmayacak." : "İptal edildi — çıkmayacak.")
+      : "İşaretlendi — bir sonraki turda değişecek.");
     await yukle();
   } catch (e) { toast("Olmadı: " + e.message); }
 };
