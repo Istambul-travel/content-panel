@@ -251,19 +251,23 @@ function eylemler(x) {
 }
 
 function ekranTakvim() {
-  const ilk = new Date(); ilk.setDate(1);
+  // ILERIYE BAKAN TAKVIM. Ayin 1'inden baslamak yanlisti: ayin sonunda
+  // acildiginda gelecek gunler ekranin altinda kaliyordu. Bugunden bir hafta
+  // once basliyor, bes hafta cizilyor: gecmis bir bakista, gelecek tamamen
+  // gorunur (25.09.2026).
+  const bas = new Date(); bas.setDate(bas.getDate() - 7);
+  bas.setDate(bas.getDate() - ((bas.getDay() + 6) % 7));
   const gunler = {};
   D.takvim.forEach((x) => { (gunler[x.gun] = gunler[x.gun] || []).push(x); });
-  const bas = new Date(ilk); const kaydir = (bas.getDay() + 6) % 7;
-  bas.setDate(bas.getDate() - kaydir);
   let h = '<div class="grid7">' + ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"]
     .map((d) => '<div class="dow">' + d + "</div>").join("");
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < 35; i++) {
     const d = new Date(bas); d.setDate(bas.getDate() + i);
     const g = d.toISOString().slice(0, 10);
     const liste = gunler[g] || [];
     h += '<div class="cell' + (liste.length ? " dolu" : "") + (g === BUGUN ? " bugun" : "") + '">' +
-      '<div class="no">' + d.getDate() + "</div>" +
+      '<div class="no">' + d.getDate() +
+        (d.getDate() === 1 ? " " + AY[d.getMonth()].slice(0, 3) : "") + "</div>" +
       liste.map((x) =>
         (x.kapak ? '<img class="thumb" src="' + E(x.kapak) + '" alt="">' : "") +
         '<div class="tag" style="color:' + (x.tur === "gonderi" ? "var(--purple-deep)" : "var(--slate)") + '">' +
