@@ -278,7 +278,7 @@ function ekranTakvim() {
         (x.tur === "gonderi" ? "GÖNDERİ" : "YAZI") + "</div>" +
         '<div class="ttl">' + E((x.baslik || "").slice(0, 46)) + "</div>" +
         '<div>' + pill(x.durum) + "</div>" +
-        (x.metin ? '<button class="bs" onclick="oku(\'' + E(x.gun) + '\')">Taslağı oku</button>' : "") +
+        (x.metin ? '<button class="bs" onclick="taslakOku(\'' + E(x.gun) + '\')">Taslağı oku</button>' : "") +
         (x.duzenlenebilir ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + eylemler(x) + "</div>" : "")
       ).join("") +
       (fazla > 0 ? '<div class="note" style="font-size:11px">+' + fazla + " daha</div>" : "") +
@@ -415,7 +415,7 @@ window.isaretle = async function (ne, anahtar) {
 // -------------------------------------------------------------- taslak okuma
 // Musteri metni YAYINDAN ONCE okuyor. Gorseller yayin gununde ekleniyor,
 // bu yuzden onizlemede yok — pencerenin altinda bunu yaziyoruz.
-window.oku = function (gun) {
+window.taslakOku = function (gun) {
   const x = (D.takvim || []).find((t) => t.gun === gun && t.metin);
   if (!x) return;
   const k = document.createElement("div");
