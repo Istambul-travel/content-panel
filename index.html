@@ -607,18 +607,18 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct,hl,tl]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
       ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
       ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`),
-      ghFile(`data/${d}/talimat.md`)]);
+      ghFile(`data/${d}/talimat.md`), ghJson(`data/${d}/ctr-firsatlari.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]},health:hl||{},talimat:tl||""});
+      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -840,7 +840,33 @@ function vSC(){
         onlar lokasyon sayfası işi, blog konusu değil.`:""}
     </div></div>`;
 
-  return tiles+dagilim+vPerf(s,d)+firsat+sayfalar+not;
+
+  /* CTR FIRSATLARI — STANDART 6 §9 (28.09.2026).
+     Sirasi iyi ama tiklanmayan sorgular konu havuzuna GIRMIYOR (dogru karar:
+     o sorguda zaten ilk sayfadayiz) ama bugune kadar baslik/meta isi olarak
+     da hicbir listeye dusmuyordu. Ilk olcum: istanbulhamam.com 69 sorgu,
+     ~546 tiklama tahmini kayip. */
+  const cf=s.ctrf||null;
+  const ctrKutu=!(cf&&cf.satir&&cf.satir.length)?"":`<div class="panelbox">
+    <header><h2>Tıklanmayan sorgular</h2><span class="sp"></span>
+    <span class="hint">${cf.esigi_gecen}/${cf.sorgu} sorgu · ~${Math.round(cf.kayip_toplam)} tıklama tahmini kayıp</span></header>
+    <div class="tw"><table><thead><tr><th>Sorgu</th><th>Gösterim</th><th>Tıklama</th>
+      <th>Sıra</th><th>Kayıp ~</th><th>Yapılacak</th></tr></thead><tbody>
+      ${cf.satir.map(x=>`<tr>
+        <td>${esc(x.sorgu)}${x.mekan?` <span style="color:var(--muted);font-size:12px">· ${esc(x.mekan)}</span>`:""}</td>
+        <td>${nf(x.gosterim||0)}</td>
+        <td class="${(x.tiklama||0)===0?"scz":""}">${nf(x.tiklama||0)}</td>
+        <td style="color:var(--muted)">${(x.sira||0).toFixed(1)}</td>
+        <td>~${Math.round(x.kayip_tahmini||0)}</td>
+        <td style="font-size:12.5px">${x.sayfa?`<a href="${esc(x.sayfa)}" target="_blank" rel="noopener">${esc(x.yapilacak)}</a>`:esc(x.yapilacak)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="note">Kayıp sayısı <b>tahmin</b>: o sıradaki beklenen tıklama oranıyla
+      gerçek oranın farkı, kesin ölçüm değil. Bu sorgulara <b>yeni yazı yazılmaz</b> —
+      o sorguda zaten ilk sayfadayız, iş başlık ve meta açıklamasında.
+      ${cf.sayfasiz?`<b>${cf.sayfasiz}</b> sorguda hangi sayfamızın göründüğü Google’dan gelmedi;
+        onlarda önce sayfayı bulmak gerekiyor.`:""}</p></div>`;
+
+  return tiles+dagilim+vPerf(s,d)+firsat+ctrKutu+sayfalar+not;
 }
 
 /* ===================== sosyal medya =====================
