@@ -22,6 +22,13 @@
      hue ile koyudan aciga gitmek. Iyi/kotu yargisini renk degil, yanindaki
      "Gomulu" gostergesi ve metin tasiyor. */
   --q1:#4f2dc4; --q2:#7047eb; --q3:#a48bff; --q4:#d6cbff;
+  /* GIRIS KANALI — kategorik (STANDART 8 · STANDART 15 §3).
+     validate_palette.js ile dogrulandi: komsu ciftlerde CVD ayrimi
+     ΔE 13.8, normal gorme 25.0, yuzeye kontrast >=3:1. SIRA BAGLAYICI:
+     olcum bu sirada yapildi (Arama → AI → Sosyal → Dogrudan). Renk tek
+     basina bilgi tasimaz: her segmentin adi ve sayisi yaninda yazili. */
+  --k-arama:#5b36d6; --k-ai:#0e9384; --k-sosyal:#a21caf;
+  --k-dogrudan:#b54708; --k-diger:#8b90a3;
   --shadow:0 1px 2px rgba(17,23,53,.05), 0 4px 14px rgba(17,23,53,.04);
   --r:14px;
   color-scheme:light;
@@ -31,6 +38,8 @@
     --bg:#111214; --surface:#191b1e; --raised:#1f2226;
     --ink:#e8e6f2; --ink-2:#a6aab8; --muted:#7e8290; --line:#2e3138; --line-2:#22252a;
     --brand:#b7a5ff; --brand-ink:#cfc2ff; --brand-soft:#2a2547;
+    --k-arama:#9c86ff; --k-ai:#12968a; --k-sosyal:#ee86cc;
+    --k-dogrudan:#c98130; --k-diger:#7e8290;
     --amber:#d9a441; --amber-soft:#2e2617;
     --red:#e0817b; --red-soft:#33201f;
     --blue:#7fb0e0; --blue-soft:#1a2632;
@@ -402,6 +411,23 @@ th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
 .pbar{display:block;height:4px;border-radius:2px;background:var(--q2);max-width:88px;
   margin:6px 0 0 auto;min-width:3px}
 
+
+/* ===== getiri (STANDART 15) ===== */
+.gbox{background:linear-gradient(135deg,var(--brand-soft) 0%,transparent 72%);
+  border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin:0 0 14px}
+.ghead{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.gnum{font-family:Manrope,Inter,system-ui,sans-serif;font-weight:800;font-size:42px;
+  line-height:1;letter-spacing:-.02em;color:var(--brand-ink)}
+.gtxt{font-size:14.5px;color:var(--ink);font-weight:600}
+.gsub{color:var(--ink-2);font-size:12.5px;margin-top:7px;line-height:1.55}
+.kbar{display:flex;gap:2px;margin:15px 0 9px;height:14px}
+.kbar>span{border-radius:7px;min-width:4px}
+.kleg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink-2)}
+.kleg b{font-weight:600;color:var(--ink)}
+.kdot{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-1px}
+.spark{display:block}
+.sparkc{opacity:.9}
+td.sparktd{width:150px}
 </style>
 </head>
 <body>
@@ -683,6 +709,110 @@ function render(){
    yazmak, calismadigini soylemek olur; oysa Google o yaziyi daha yeni
    goruyor. "Olcum bekliyor" ile "gosterilmedi" ayri seyler ve ayri
    yaziliyor. */
+/* Giris kanallari — SIRA BAGLAYICI (jeton yorumuna bak). Listede olmayan
+   bir kanal adi gelirse "Diger"e katlanir; yeni hue uretilmez. */
+const KANAL = [["Arama","var(--k-arama)"],["AI","var(--k-ai)"],
+               ["Sosyal","var(--k-sosyal)"],["Doğrudan","var(--k-dogrudan)"],
+               ["Diğer","var(--k-diger)"]];
+
+function sparkSvg(dizi, renk, w, h){
+  const a=(dizi||[]).map(x=>+x||0);
+  w=w||150; h=h||34;
+  if(a.length<2) return "";
+  const mx=Math.max.apply(null,a.concat([1]));
+  const st=(w-4)/(a.length-1);
+  const pts=a.map((v,i)=>[2+i*st, h-3-(v/mx)*(h-8)]);
+  const d=pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  const son=pts[pts.length-1];
+  return '<svg class="spark sparkc" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'
+    +'<polygon points="2,'+(h-1)+' '+d+' '+(w-2)+','+(h-1)+'" fill="'+renk+'" opacity=".13"></polygon>'
+    +'<polyline points="'+d+'" fill="none" stroke="'+renk+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>'
+    +'<circle cx="'+son[0].toFixed(1)+'" cy="'+son[1].toFixed(1)+'" r="2.6" fill="'+renk+'"></circle></svg>';
+}
+
+function kanalTopla(kanal){
+  const k={}; KANAL.forEach(x=>{k[x[0]]=0;});
+  Object.entries(kanal||{}).forEach(([ad,n])=>{
+    if(k[ad]===undefined) k["Diğer"]+=(+n||0); else k[ad]+=(+n||0);
+  });
+  return k;
+}
+
+function kanalBar(kanal){
+  const k=kanalTopla(kanal);
+  const var_=KANAL.filter(x=>k[x[0]]>0);
+  if(!var_.length) return "";
+  const bar=var_.map(x=>'<span style="flex:'+k[x[0]]+';background:'+x[1]+'"></span>').join("");
+  const leg=var_.map(x=>'<span><i class="kdot" style="background:'+x[1]+'"></i>'
+    +esc(x[0])+' <b>'+nf(k[x[0]])+'</b></span>').join("");
+  return '<div class="kbar">'+bar+'</div><div class="kleg">'+leg+'</div>';
+}
+
+/* ===== GETIRI — "bu yapinin yazilari siteye ne getirdi" =====
+   Ustteki Search Console kartlari SITENIN TAMAMINI olcer. Burasi yalnizca
+   bu yapinin yayinladigi yazilari olcer ve girisi KANALA gore ayirir:
+   Google'in kendi raporu AI yonlendirmesini "Referral" torbasina atiyor,
+   burada ayri duruyor (STANDART 15 §3). */
+function vGetiri(s){
+  const G=(s.gtr&&s.gtr.toplam)?s.gtr:null;
+  if(!G) return "";
+  const T=G.toplam||{}, gun=G.gunluk||[], yazi=G.yazi||[];
+  const girisEgri=gun.map(x=>x.giris), gosEgri=gun.map(x=>x.gosterim);
+  const ai=T.ai_toplam||0;
+  const aiPay=(T.giris>0)?Math.round(ai*1000/T.giris)/10:null;
+  const ilk=gun.length?gun[0].tarih:"";
+  const son=gun.length?gun[gun.length-1].tarih:"";
+
+  const hero='<div class="gbox">'
+    +'<div class="ghead"><div>'
+    +'<div class="gnum">'+nf(T.giris||0)+'</div>'
+    +'<div class="gtxt">okur yazılarımızdan siteye girdi</div>'
+    +'<div class="gsub">'+nf(T.gosterim||0)+' kez Google\'da göründü'
+    +' · '+nf(T.tik||0)+' tıklama'
+    +' · '+nf(T.olcum_veren||0)+' yazı ölçüm veriyor'
+    +(ilk?'<br>ölçüm '+esc(ilk)+' → '+esc(son)+', her gün tazeleniyor':'')
+    +'</div></div>'
+    +'<div>'+sparkSvg(girisEgri,"var(--brand)",210,52)+'</div>'
+    +'</div>'
+    +kanalBar(T.kanal)
+    +'<p class="note" style="margin:10px 0 0">Arama = Google ve diğer arama motorları. '
+    +'AI = ChatGPT, Perplexity, Gemini gibi yapay zekâ cevaplarından gelen okur — '
+    +'Google kendi raporunda bunları “Referral” diye tek torbaya atıyor, burada ayrı duruyor.</p>'
+    +'</div>';
+
+  const kart='<div class="tiles">'
+    +'<div class="tile"><div class="lab">'+ico("chart")+'Gösterim</div>'
+    +'<div class="num">'+nf(T.gosterim||0)+'</div>'
+    +'<div class="sub">Google\'da kaç kez göründü</div>'
+    +sparkSvg(gosEgri,"var(--k-arama)",150,30)+'</div>'
+    +'<div class="tile '+((ai>0)?"okt":"")+'"><div class="lab">'+ico("check")+'AI cevabından giriş</div>'
+    +'<div class="num">'+nf(ai)+'</div>'
+    +'<div class="sub">'+(aiPay===null?"ölçüm bekliyor":("girişin %"+String(aiPay).replace(".",",")+"'i"))+'</div></div>'
+    +'<div class="tile"><div class="lab">'+ico("gauge")+'Ürün sayfasına geçiş</div>'
+    +'<div class="num">'+nf(T.urun||0)+'</div>'
+    +'<div class="sub">'+((T.gecis_orani===null||T.gecis_orani===undefined)?"ölçüm bekliyor"
+        :("girenlerin %"+String(Math.round((T.gecis_orani||0)*1000)/10).replace(".",",")+"'i"))+'</div></div>'
+    +'</div>';
+
+  const satirlar=yazi.map(y=>{
+    const bos=!(y.giris||y.gosterim);
+    return '<tr><td class="ptitle">'+esc(y.yol)+'</td>'
+      +'<td>'+(bos?'<span style="color:var(--muted)">ölçüm bekliyor</span>':nf(y.gosterim||0))+'</td>'
+      +'<td><b>'+nf(y.giris||0)+'</b></td>'
+      +'<td>'+(y.ai_toplam?('<span class="kdot" style="background:var(--k-ai)"></span>'+nf(y.ai_toplam)):'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td>'+(y.urun?nf(y.urun):'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td class="sparktd">'+sparkSvg(y.egri,"var(--brand)",140,26)+'</td></tr>';
+  }).join("");
+
+  const tablo=!yazi.length?"":'<div class="panelbox"><header><h2>Hangi yazı kaç giriş getirdi</h2>'
+    +'<span class="hint">son 30 gün · giriş çok olan üstte</span></header>'
+    +'<div class="tw"><table><thead><tr><th>YAZI</th><th>GÖSTERİM</th><th>GİRİŞ</th>'
+    +'<th>AI</th><th>ÜRÜNE GEÇİŞ</th><th>SON 30 GÜN</th></tr></thead>'
+    +'<tbody>'+satirlar+'</tbody></table></div></div>';
+
+  return hero+kart+tablo;
+}
+
 function vPerf(s, d){
   const yazilar = (s.published || []);
   if(!yazilar.length) return "";
@@ -898,7 +1028,7 @@ function vSC(){
       ${cf.sayfasiz?`<b>${cf.sayfasiz}</b> sorguda hangi sayfamızın göründüğü Google’dan gelmedi;
         onlarda önce sayfayı bulmak gerekiyor.`:""}</p></div>`;
 
-  return tiles+dagilim+vPerf(s,d)+firsat+ctrKutu+sayfalar+not;
+  return vGetiri(s)+tiles+dagilim+vPerf(s,d)+firsat+ctrKutu+sayfalar+not;
 }
 
 /* ===================== sosyal medya =====================
