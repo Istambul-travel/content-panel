@@ -607,18 +607,19 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf,ga]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
       ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
       ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`),
-      ghFile(`data/${d}/talimat.md`), ghJson(`data/${d}/ctr-firsatlari.json`)]);
+      ghFile(`data/${d}/talimat.md`), ghJson(`data/${d}/ctr-firsatlari.json`),
+      ghJson(`data/${d}/ga4.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null});
+      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null,ga4:ga||null});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -687,6 +688,14 @@ function vPerf(s, d){
   const kayit = {};
   (d.articles || []).forEach(a => { if(a && a.url) kayit[a.url] = a; });
   const katmanYok = !(d.articles || []).length;
+  /* STANDART 15 — GA4 girisi: "bu yazidan siteye kac kisi GIRDI".
+     Search Console yalnizca Google'i olcer; buradaki sayi Instagram ve
+     dogrudan girisi de kapsar. Urune gecis, girenlerin kacinin urun
+     sayfasina ulastigi. Olculmemis yazi bos kalir, 0 yazmaz. */
+  const G = (s.ga4 && s.ga4.getiri && s.ga4.getiri.toplam) ? s.ga4.getiri : null;
+  const gmap = {};
+  ((G && G.yazi) || []).forEach(y => { if(y && y.yol) gmap[y.yol] = y; });
+  const gyol = u => ((u || "").replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "") || "/");
 
   const satir = yazilar.map(p => {
     const a = kayit[p.url] || null;
@@ -716,6 +725,11 @@ function vPerf(s, d){
     + '<div class="hl">gösterim</div></div>'
     + '<div class="h"><div class="hn iyi">' + nf(topT) + '</div>'
     + '<div class="hl">tıklama — siteye giren</div></div>'
+    + (G ? '<div class="h"><div class="hn iyi">' + nf(G.toplam.giris || 0) + '</div>'
+      + '<div class="hl">yazıdan siteye giriş</div></div>'
+      + '<div class="h"><div class="hn' + ((G.toplam.urun || 0) > 0 ? ' iyi' : '') + '">'
+      + nf(G.toplam.urun || 0) + '</div>'
+      + '<div class="hl">ürün sayfasına geçiş</div></div>' : '')
     + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
     + '<div class="hl">yayınlanan yazı</div></div>'
     + '<div class="h"><div class="hn">' + nf(olculen) + '</div>'
@@ -728,9 +742,12 @@ function vPerf(s, d){
       (x.gun === 0 ? "bugün" : x.gun === 1 ? "dün" : x.gun + " gün önce");
     const dil = cevSay(p);
     const seo = (p.seo_score != null) ? Math.round(p.seo_score) : "—";
+    const gg = gmap[gyol(p.url)] || null;
+    const gnot = (gg && gg.giris) ? (" · " + nf(gg.giris) + " giriş"
+      + (gg.urun ? " · " + nf(gg.urun) + " ürüne geçiş" : "")) : "";
     const ad = '<td class="ptitle"><a href="' + esc(p.url || "#")
       + '" target="_blank" rel="noopener">' + esc(p.title || p.slug || "?") + '</a>'
-      + '<small>' + esc(yas) + (dil ? " · " + dil + " dil" : "") + '</small></td>';
+      + '<small>' + esc(yas) + (dil ? " · " + dil + " dil" : "") + esc(gnot) + '</small></td>';
     if(x.g > 0){
       const w = Math.max(3, Math.round(x.g * 100 / enCok));
       return '<tr>' + ad
