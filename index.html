@@ -715,6 +715,11 @@ const KANAL = [["Arama","var(--k-arama)"],["AI","var(--k-ai)"],
                ["Sosyal","var(--k-sosyal)"],["Doğrudan","var(--k-dogrudan)"],
                ["Diğer","var(--k-diger)"]];
 
+/* Tam URL -> yol. vPerf icindeki gyol yerel kalsin diye ayri duruyor. */
+function yolSade(u){
+  return ((u||"").replace(/^https?:\/\/[^/]+/,"").split("?")[0].replace(/\/$/,"") || "/");
+}
+
 function sparkSvg(dizi, renk, w, h){
   const a=(dizi||[]).map(x=>+x||0);
   w=w||150; h=h||34;
@@ -766,7 +771,7 @@ function vGetiri(s){
   /* Yol -> baslik: getiri.json yalnizca yolu tutuyor, baslik yayin
      kaydinda. Eslesmezse yol yaziliyor, uydurma baslik uretilmiyor. */
   const bas={};
-  (s.published||[]).forEach(p=>{ const y=gyol(p.url); if(y) bas[y]=p.title||""; });
+  (s.published||[]).forEach(p=>{ const y=yolSade(p.url); if(y) bas[y]=p.title||""; });
   const ai=T.ai_toplam||0;
   const aiPay=(T.giris>0)?Math.round(ai*1000/T.giris)/10:null;
   const ilk=pencere.length?pencere[0].tarih:"";
