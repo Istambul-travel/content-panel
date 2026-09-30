@@ -607,19 +607,20 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf,ga]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf,ga,gt]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
       ghJson(`data/${d}/search-console.json`), ghJson(`data/${d}/social.json`),
       ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`),
       ghFile(`data/${d}/talimat.md`), ghJson(`data/${d}/ctr-firsatlari.json`),
-      ghJson(`data/${d}/ga4.json`)]);
+      ghJson(`data/${d}/ga4.json`),
+      ghJson(`data/${d}/getiri.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null,ga4:ga||null});
+      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null,ga4:ga||null,gtr:gt||null});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -692,7 +693,7 @@ function vPerf(s, d){
      Search Console yalnizca Google'i olcer; buradaki sayi Instagram ve
      dogrudan girisi de kapsar. Urune gecis, girenlerin kacinin urun
      sayfasina ulastigi. Olculmemis yazi bos kalir, 0 yazmaz. */
-  const G = (s.ga4 && s.ga4.getiri && s.ga4.getiri.toplam) ? s.ga4.getiri : null;
+  const G = (s.gtr && s.gtr.toplam) ? s.gtr : null;
   const gmap = {};
   ((G && G.yazi) || []).forEach(y => { if(y && y.yol) gmap[y.yol] = y; });
   const gyol = u => ((u || "").replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "") || "/");
@@ -729,12 +730,23 @@ function vPerf(s, d){
       + '<div class="hl">yazıdan siteye giriş</div></div>'
       + '<div class="h"><div class="hn' + ((G.toplam.urun || 0) > 0 ? ' iyi' : '') + '">'
       + nf(G.toplam.urun || 0) + '</div>'
-      + '<div class="hl">ürün sayfasına geçiş</div></div>' : '')
+      + '<div class="hl">ürün sayfasına geçiş</div></div>'
+      + '<div class="h"><div class="hn' + ((G.toplam.ai_toplam || 0) > 0 ? ' iyi' : '') + '">'
+      + nf(G.toplam.ai_toplam || 0) + '</div>'
+      + '<div class="hl">AI cevabından giriş</div></div>' : '')
     + '<div class="h"><div class="hn">' + nf(yazilar.length) + '</div>'
     + '<div class="hl">yayınlanan yazı</div></div>'
     + '<div class="h"><div class="hn">' + nf(olculen) + '</div>'
     + '<div class="hl">ölçüm veren yazı</div></div>'
-    + '</div>';
+    + '</div>'
+    + (G && Object.keys(G.toplam.kanal || {}).length
+        ? '<p class="note">Giriş kanalı: '
+          + Object.entries(G.toplam.kanal).sort((a,b) => b[1]-a[1])
+              .map(x => esc(x[0]) + ' ' + nf(x[1])).join(' · ')
+          + '. Arama = Google ve diğer arama motorları, AI = ChatGPT, Perplexity, Gemini gibi '
+          + 'yapay zekâ cevaplarından gelen okur. Google kendi raporunda bunları '
+          + '"Referral" diye tek torbaya atıyor; burada ayrı duruyor.</p>'
+        : '');
 
   const govde = satir.map(x => {
     const p = x.p;
@@ -743,8 +755,11 @@ function vPerf(s, d){
     const dil = cevSay(p);
     const seo = (p.seo_score != null) ? Math.round(p.seo_score) : "—";
     const gg = gmap[gyol(p.url)] || null;
-    const gnot = (gg && gg.giris) ? (" · " + nf(gg.giris) + " giriş"
-      + (gg.urun ? " · " + nf(gg.urun) + " ürüne geçiş" : "")) : "";
+    const gnot = (gg && (gg.giris || gg.gosterim))
+      ? ((gg.giris ? " · " + nf(gg.giris) + " giriş" : "")
+         + (gg.ai_toplam ? " (AI " + nf(gg.ai_toplam) + ")" : "")
+         + (gg.urun ? " · " + nf(gg.urun) + " ürüne geçiş" : ""))
+      : "";
     const ad = '<td class="ptitle"><a href="' + esc(p.url || "#")
       + '" target="_blank" rel="noopener">' + esc(p.title || p.slug || "?") + '</a>'
       + '<small>' + esc(yas) + (dil ? " · " + dil + " dil" : "") + esc(gnot) + '</small></td>';
