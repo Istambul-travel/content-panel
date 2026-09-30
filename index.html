@@ -757,11 +757,20 @@ function vGetiri(s){
   const G=(s.gtr&&s.gtr.toplam)?s.gtr:null;
   if(!G) return "";
   const T=G.toplam||{}, gun=G.gunluk||[], yazi=G.yazi||[];
-  const girisEgri=gun.map(x=>x.giris), gosEgri=gun.map(x=>x.gosterim);
+  /* Bas taraftaki bos gunler kirpiliyor: seri daha yeni basladi ve
+     olculmeyen gunleri duz cizgi gostermek "hic giris yok" demekle ayni
+     goruntuyu verirdi. */
+  const ilkVeri=gun.findIndex(x=>(x.giris||0)||(x.gosterim||0));
+  const pencere=ilkVeri<0?[]:gun.slice(ilkVeri);
+  const girisEgri=pencere.map(x=>x.giris), gosEgri=pencere.map(x=>x.gosterim);
+  /* Yol -> baslik: getiri.json yalnizca yolu tutuyor, baslik yayin
+     kaydinda. Eslesmezse yol yaziliyor, uydurma baslik uretilmiyor. */
+  const bas={};
+  (s.published||[]).forEach(p=>{ const y=gyol(p.url); if(y) bas[y]=p.title||""; });
   const ai=T.ai_toplam||0;
   const aiPay=(T.giris>0)?Math.round(ai*1000/T.giris)/10:null;
-  const ilk=gun.length?gun[0].tarih:"";
-  const son=gun.length?gun[gun.length-1].tarih:"";
+  const ilk=pencere.length?pencere[0].tarih:"";
+  const son=pencere.length?pencere[pencere.length-1].tarih:"";
 
   const hero='<div class="gbox">'
     +'<div class="ghead"><div>'
@@ -796,12 +805,13 @@ function vGetiri(s){
 
   const satirlar=yazi.map(y=>{
     const bos=!(y.giris||y.gosterim);
-    return '<tr><td class="ptitle">'+esc(y.yol)+'</td>'
+    const ad=bas[y.yol]||"";
+    return '<tr><td class="ptitle">'+(ad?esc(ad)+'<small>'+esc(y.yol)+'</small>':esc(y.yol))+'</td>'
       +'<td>'+(bos?'<span style="color:var(--muted)">ölçüm bekliyor</span>':nf(y.gosterim||0))+'</td>'
       +'<td><b>'+nf(y.giris||0)+'</b></td>'
       +'<td>'+(y.ai_toplam?('<span class="kdot" style="background:var(--k-ai)"></span>'+nf(y.ai_toplam)):'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td>'+(y.urun?nf(y.urun):'<span style="color:var(--muted)">—</span>')+'</td>'
-      +'<td class="sparktd">'+sparkSvg(y.egri,"var(--brand)",140,26)+'</td></tr>';
+      +'<td class="sparktd">'+sparkSvg((y.egri||[]).slice(-Math.max(pencere.length,7)),"var(--brand)",140,26)+'</td></tr>';
   }).join("");
 
   const tablo=!yazi.length?"":'<div class="panelbox"><header><h2>Hangi yazı kaç giriş getirdi</h2>'
