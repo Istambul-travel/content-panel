@@ -801,11 +801,11 @@ function vGetiri(s){
     +sparkSvg(gosEgri,"var(--k-arama)",150,30)+'</div>'
     +'<div class="tile '+((ai>0)?"okt":"")+'"><div class="lab">'+ico("check")+'AI cevabından giriş</div>'
     +'<div class="num">'+nf(ai)+'</div>'
-    +'<div class="sub">'+(aiPay===null?"ölçüm bekliyor":("girişin %"+String(aiPay).replace(".",",")+"'i"))+'</div></div>'
+    +'<div class="sub">'+(aiPay===null?"ölçüm bekliyor":("giriş payı %"+String(aiPay).replace(".",",")))+'</div></div>'
     +'<div class="tile"><div class="lab">'+ico("gauge")+'Ürün sayfasına geçiş</div>'
     +'<div class="num">'+nf(T.urun||0)+'</div>'
     +'<div class="sub">'+((T.gecis_orani===null||T.gecis_orani===undefined)?"ölçüm bekliyor"
-        :("girenlerin %"+String(Math.round((T.gecis_orani||0)*1000)/10).replace(".",",")+"'i"))+'</div></div>'
+        :("geçiş oranı %"+String(Math.round((T.gecis_orani||0)*1000)/10).replace(".",",")))+'</div></div>'
     +'</div>';
 
   const satirlar=yazi.map(y=>{
