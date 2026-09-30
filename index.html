@@ -494,8 +494,8 @@ td.sparktd{width:150px}
         <p id="sub">—</p>
       </div>
       <span class="sp"></span>
-      <button class="btn" data-ico="refresh" onclick="load()"><span>Yenile</span></button>
-      <button class="btn primary" id="runBtn" data-ico="play" onclick="runNow()"><span>Şimdi çalıştır</span></button>
+      <button class="btn" data-ico="refresh" onclick="load()" title="Ekrandaki verileri depodan yeniden okur. Yeni ölçüm yapmaz, para harcamaz."><span>Yenile</span></button>
+      <button class="btn primary" id="runBtn" data-ico="play" onclick="runNow()" title="Günlük içerik turunu başlatır: yazı yazılır, görsel üretilir, yayınlanır. Para harcar."><span>Şimdi çalıştır</span></button>
     </div>
     <div class="content" id="view"></div>
   </main>
@@ -633,7 +633,7 @@ async function load(){
   for(const d of domains){
     const y=await ghFile(`sites/${d}.yaml`);
     const c=y?peek(y):{mode:"?",perWeek:0,days:[],brands:[]};
-    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf,ga,gt]=await Promise.all([
+    const [td,pub,li,fx,cd,sc,so,ct,hl,tl,cf,ga,gt,gs]=await Promise.all([
       ghJson(`data/${d}/topics.json`), ghJson(`data/${d}/published.json`),
       ghJson(`data/${d}/link-index.json`), ghFile(`data/${d}/facts.yaml`),
       ghJson(`data/${d}/candidates.json`),
@@ -641,12 +641,13 @@ async function load(){
       ghJson(`data/${d}/cost.json`), ghJson(`data/${d}/health.json`),
       ghFile(`data/${d}/talimat.md`), ghJson(`data/${d}/ctr-firsatlari.json`),
       ghJson(`data/${d}/ga4.json`),
-      ghJson(`data/${d}/getiri.json`)]);
+      ghJson(`data/${d}/getiri.json`),
+      ghJson(`data/${d}/yazi-gunluk.json`)]);
     out.push({domain:d,...c,doc:td||{topics:[]},topics:(td&&td.topics)||[],
       volume_source:(td&&td.volume_source)||null,
       published:pub||[],links:(li||[]).length,facts:factStatus(fx),
       cand:cd||{seeds:[],harvested:[]},sc:sc||null,soc:so||{posts:[]},
-      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null,ga4:ga||null,gtr:gt||null});
+      cost:ct||{runs:[]},health:hl||{},talimat:tl||"",ctrf:cf||null,ga4:ga||null,gtr:gt||null,seri:(gs&&gs.satir)||[]});
   }
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
@@ -683,7 +684,7 @@ function render(){
     seo:["SEO skoru","Her yazının SEO, AEO ve GEO ölçümü"],
     qa:["Kalite kapısı","Yayınlanmadan reddedilen yazılar"],
     runs:["Çalışmalar","Otomasyonun geçmişi"],
-    sc:["Analitik","Google aramada gerçekte ne oluyor"],
+    sc:["Analitik","Yazıların getirisi ve Google arama ölçümü"],
     soc:["Sosyal medya","Haftanın gönderileri ve elle müdahale"],
    pub:["Yayınlananlar","Çıkan yazılar, dilleri ve gönderileri — canlıdaki hâliyle"],
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
@@ -755,39 +756,97 @@ function kanalBar(kanal){
 
 /* ===== GETIRI — "bu yapinin yazilari siteye ne getirdi" =====
    Ustteki Search Console kartlari SITENIN TAMAMINI olcer. Burasi yalnizca
-   bu yapinin yayinladigi yazilari olcer ve girisi KANALA gore ayirir:
-   Google'in kendi raporu AI yonlendirmesini "Referral" torbasina atiyor,
-   burada ayri duruyor (STANDART 15 §3). */
+   bu yapinin yayinladigi yazilari olcer, girisi KANALA gore ayirir ve
+   TARIH ARALIGI secilebilir. Hesap ham gunluk seriden (yazi-gunluk.json)
+   burada yapiliyor: boylece pencere degisince yeni bir tur beklemiyoruz.
+   STANDART 15. */
+let GWIN = 28;
+function setGwin(n){ GWIN = n; render(); }
+
+async function olcumTazele(){
+  if(!confirm("Ölçüm turu başlatılsın mı?\n\nSearch Console ve GA4'ten son 7 gün yeniden çekilir. Yazı yazılmaz, görsel üretilmez, para harcanmaz.\n\nSonuç birkaç dakika sonra \"Yenile\" ile görünür."))
+    return;
+  try{
+    await gh("/actions/workflows/olcum.yml/dispatches",
+      {method:"POST",body:JSON.stringify({ref:"main",inputs:{}})});
+    toast("Ölçüm başlatıldı — birkaç dakika sonra Yenile");
+  }catch(e){ toast("Başlatılamadı: "+e.message); }
+}
+
+function gunDizi(bas, son){
+  const out=[]; const e=new Date(son+"T00:00:00Z");
+  for(let d=new Date(bas+"T00:00:00Z"); d<=e; d.setUTCDate(d.getUTCDate()+1))
+    out.push(d.toISOString().slice(0,10));
+  return out;
+}
+
+/* Pencere, serinin KENDI son gununden geriye sayilir — "bugun"den degil.
+   Google uc gun geriden geldigi icin bugunden saymak pencereyi kaydirir. */
+function getiriPencere(seri, gun){
+  const satir=seri||[];
+  if(!satir.length) return null;
+  const son=satir.map(r=>String(r.tarih)).sort().slice(-1)[0];
+  const d=new Date(son+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()-(gun-1));
+  const bas=d.toISOString().slice(0,10);
+  return {bas, son, satir: satir.filter(r=>String(r.tarih)>=bas && String(r.tarih)<=son)};
+}
+
+function getiriTopla(rows){
+  const o={gosterim:0,tik:0,giris:0,urun:0,kanal:{},ai:{},ai_toplam:0};
+  (rows||[]).forEach(r=>{
+    o.gosterim+=+r.gosterim||0; o.tik+=+r.tik||0;
+    o.giris+=+r.giris||0; o.urun+=+r.urun||0;
+    Object.entries(r.kanal||{}).forEach(([k,n])=>{o.kanal[k]=(o.kanal[k]||0)+(+n||0);});
+    Object.entries(r.ai||{}).forEach(([k,n])=>{o.ai[k]=(o.ai[k]||0)+(+n||0);});
+  });
+  o.ai_toplam=Object.values(o.ai).reduce((a,b)=>a+b,0);
+  return o;
+}
+
 function vGetiri(s){
-  const G=(s.gtr&&s.gtr.toplam)?s.gtr:null;
-  if(!G) return "";
-  const T=G.toplam||{}, gun=G.gunluk||[], yazi=G.yazi||[];
-  /* Bas taraftaki bos gunler kirpiliyor: seri daha yeni basladi ve
-     olculmeyen gunleri duz cizgi gostermek "hic giris yok" demekle ayni
-     goruntuyu verirdi. */
-  const ilkVeri=gun.findIndex(x=>(x.giris||0)||(x.gosterim||0));
-  const pencere=ilkVeri<0?[]:gun.slice(ilkVeri);
-  const girisEgri=pencere.map(x=>x.giris), gosEgri=pencere.map(x=>x.gosterim);
-  /* Yol -> baslik: getiri.json yalnizca yolu tutuyor, baslik yayin
-     kaydinda. Eslesmezse yol yaziliyor, uydurma baslik uretilmiyor. */
-  const bas={};
-  (s.published||[]).forEach(p=>{ const y=yolSade(p.url); if(y) bas[y]=p.title||""; });
+  const P=getiriPencere(s.seri, GWIN);
+  const dugme=[7,28,60].map(n=>'<button class="btn'+(GWIN===n?" primary":"")
+    +'" style="padding:5px 11px;font-size:12.5px" onclick="setGwin('+n+')">'+n+' gün</button>').join(" ");
+  const arac='<div style="display:flex;gap:8px;align-items:center;margin:0 0 12px;flex-wrap:wrap">'
+    +dugme+'<span class="sp" style="flex:1"></span>'
+    +'<button class="btn" style="padding:5px 11px;font-size:12.5px" onclick="olcumTazele()"'
+    +' title="Search Console ve GA4 ölçümünü yeniden çeker. Yazı yazmaz, para harcamaz.">Ölçümü tazele</button></div>';
+
+  if(!P) return arac+'<div class="panelbox"><header><h2>Getiri</h2></header>'
+    +'<p class="note">Günlük ölçüm serisi henüz yok. İlk ölçüm turundan sonra burada '
+    +'yazı başına giriş, kanal kırılımı ve eğri görünecek.</p></div>';
+
+  const T=getiriTopla(P.satir);
+  const gunler=gunDizi(P.bas,P.son);
+  const gunToplam={}; gunler.forEach(g=>{gunToplam[g]={giris:0,gosterim:0};});
+  P.satir.forEach(r=>{ const g=gunToplam[String(r.tarih)]; if(g){ g.giris+=+r.giris||0; g.gosterim+=+r.gosterim||0; } });
+  const girisEgri=gunler.map(g=>gunToplam[g].giris);
+  const gosEgri=gunler.map(g=>gunToplam[g].gosterim);
+
+  const arama=T.kanal["Arama"]||0;
   const ai=T.ai_toplam||0;
-  const aiPay=(T.giris>0)?Math.round(ai*1000/T.giris)/10:null;
-  const ilk=pencere.length?pencere[0].tarih:"";
-  const son=pencere.length?pencere[pencere.length-1].tarih:"";
+  const oran=(n)=>T.giris>0?("giriş payı %"+String(Math.round(n*1000/T.giris)/10).replace(".",",")):"ölçüm bekliyor";
+
+  /* yol -> baslik; eslesmezse yol yazilir, uydurma baslik uretilmez */
+  const bas={}; (s.published||[]).forEach(p=>{ const y=yolSade(p.url); if(y) bas[y]=p.title||""; });
+
+  const yaziMap={};
+  P.satir.forEach(r=>{ (yaziMap[r.yol]=yaziMap[r.yol]||[]).push(r); });
+  const yazilar=Object.entries(yaziMap).map(([yol,rows])=>{
+    const o=getiriTopla(rows);
+    const gm={}; rows.forEach(r=>{gm[String(r.tarih)]=+r.giris||0;});
+    o.yol=yol; o.egri=gunler.map(g=>gm[g]||0);
+    return o;
+  }).sort((a,b)=>(b.giris-a.giris)||(b.gosterim-a.gosterim)||a.yol.localeCompare(b.yol));
 
   const hero='<div class="gbox">'
     +'<div class="ghead"><div>'
-    +'<div class="gnum">'+nf(T.giris||0)+'</div>'
+    +'<div class="gnum">'+nf(T.giris)+'</div>'
     +'<div class="gtxt">okur yazılarımızdan siteye girdi</div>'
-    +'<div class="gsub">'+nf(T.gosterim||0)+' kez Google\'da göründü'
-    +' · '+nf(T.tik||0)+' tıklama'
-    +' · '+nf(T.olcum_veren||0)+' yazı ölçüm veriyor'
-    +(ilk?'<br>ölçüm '+esc(ilk)+' → '+esc(son)+', her gün tazeleniyor':'')
-    +'</div></div>'
-    +'<div>'+sparkSvg(girisEgri,"var(--brand)",210,52)+'</div>'
-    +'</div>'
+    +'<div class="gsub">'+nf(T.gosterim)+' kez Google\'da göründü · '
+    +nf(T.tik)+' Google tıklaması · '+nf(yazilar.length)+' yazı ölçüm veriyor'
+    +'<br>ölçüm '+esc(P.bas)+' → '+esc(P.son)+', her gün tazeleniyor</div></div>'
+    +'<div>'+sparkSvg(girisEgri,"var(--brand)",210,52)+'</div></div>'
     +kanalBar(T.kanal)
     +'<p class="note" style="margin:10px 0 0">Arama = Google ve diğer arama motorları. '
     +'AI = ChatGPT, Perplexity, Gemini gibi yapay zekâ cevaplarından gelen okur — '
@@ -795,37 +854,45 @@ function vGetiri(s){
     +'</div>';
 
   const kart='<div class="tiles">'
-    +'<div class="tile"><div class="lab">'+ico("chart")+'Gösterim</div>'
-    +'<div class="num">'+nf(T.gosterim||0)+'</div>'
-    +'<div class="sub">Google\'da kaç kez göründü</div>'
+    +'<div class="tile"><div class="lab">'+ico("chart")+'Google\'da gösterim</div>'
+    +'<div class="num">'+nf(T.gosterim)+'</div>'
+    +'<div class="sub">arama sonuçlarında kaç kez göründü</div>'
     +sparkSvg(gosEgri,"var(--k-arama)",150,30)+'</div>'
-    +'<div class="tile '+((ai>0)?"okt":"")+'"><div class="lab">'+ico("check")+'AI cevabından giriş</div>'
+    +'<div class="tile"><div class="lab">'+ico("check")+'Aramadan giriş</div>'
+    +'<div class="num">'+nf(arama)+'</div>'
+    +'<div class="sub">'+oran(arama)+'</div></div>'
+    +'<div class="tile '+(ai>0?"okt":"")+'"><div class="lab">'+ico("check")+'AI cevabından giriş</div>'
     +'<div class="num">'+nf(ai)+'</div>'
-    +'<div class="sub">'+(aiPay===null?"ölçüm bekliyor":("giriş payı %"+String(aiPay).replace(".",",")))+'</div></div>'
+    +'<div class="sub">'+oran(ai)+'</div></div>'
     +'<div class="tile"><div class="lab">'+ico("gauge")+'Ürün sayfasına geçiş</div>'
-    +'<div class="num">'+nf(T.urun||0)+'</div>'
-    +'<div class="sub">'+((T.gecis_orani===null||T.gecis_orani===undefined)?"ölçüm bekliyor"
-        :("geçiş oranı %"+String(Math.round((T.gecis_orani||0)*1000)/10).replace(".",",")))+'</div></div>'
+    +'<div class="num">'+nf(T.urun)+'</div>'
+    +'<div class="sub">'+(T.giris>0?("geçiş oranı %"+String(Math.round(T.urun*1000/T.giris)/10).replace(".",",")):"ölçüm bekliyor")+'</div></div>'
     +'</div>';
 
-  const satirlar=yazi.map(y=>{
-    const bos=!(y.giris||y.gosterim);
+  const satirlar=yazilar.map(y=>{
     const ad=bas[y.yol]||"";
+    const ar=y.kanal["Arama"]||0;
     return '<tr><td class="ptitle">'+(ad?esc(ad)+'<small>'+esc(y.yol)+'</small>':esc(y.yol))+'</td>'
-      +'<td>'+(bos?'<span style="color:var(--muted)">ölçüm bekliyor</span>':nf(y.gosterim||0))+'</td>'
-      +'<td><b>'+nf(y.giris||0)+'</b></td>'
+      +'<td>'+nf(y.gosterim)+'</td>'
+      +'<td><b>'+nf(y.giris)+'</b></td>'
+      +'<td>'+(ar?nf(ar):'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td>'+(y.ai_toplam?('<span class="kdot" style="background:var(--k-ai)"></span>'+nf(y.ai_toplam)):'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td>'+(y.urun?nf(y.urun):'<span style="color:var(--muted)">—</span>')+'</td>'
-      +'<td class="sparktd">'+sparkSvg((y.egri||[]).slice(-Math.max(pencere.length,7)),"var(--brand)",140,26)+'</td></tr>';
+      +'<td class="sparktd">'+sparkSvg(y.egri,"var(--brand)",140,26)+'</td></tr>';
   }).join("");
 
-  const tablo=!yazi.length?"":'<div class="panelbox"><header><h2>Hangi yazı kaç giriş getirdi</h2>'
-    +'<span class="hint">son 30 gün · giriş çok olan üstte</span></header>'
+  const tablo=!yazilar.length?"":'<div class="panelbox"><header><h2>Hangi yazı kaç giriş getirdi</h2>'
+    +'<span class="hint">'+esc(P.bas)+' → '+esc(P.son)+' · giriş çok olan üstte</span></header>'
+    +'<p class="note" style="margin:0 0 10px">GÖSTERİM yalnız <b>Google</b>\'dır: o yazının arama '
+    +'sonuçlarında kaç kez göründüğü. GİRİŞ ise <b>her kanaldan</b> toplamdır — Google, AI, '
+    +'Instagram, doğrudan. Bu yüzden gösterimi 0 olan bir yazının girişi olabilir: '
+    +'Google onu hiç göstermemiştir ama okur sosyal medyadan ya da doğrudan gelmiştir. '
+    +'ARAMA sütunu, girişin Google aramasından gelen kısmıdır.</p>'
     +'<div class="tw"><table><thead><tr><th>YAZI</th><th>GÖSTERİM</th><th>GİRİŞ</th>'
-    +'<th>AI</th><th>ÜRÜNE GEÇİŞ</th><th>SON 30 GÜN</th></tr></thead>'
+    +'<th>ARAMA</th><th>AI</th><th>ÜRÜNE GEÇİŞ</th><th>'+GWIN+' GÜN</th></tr></thead>'
     +'<tbody>'+satirlar+'</tbody></table></div></div>';
 
-  return hero+kart+tablo;
+  return arac+hero+kart+tablo;
 }
 
 function vPerf(s, d){
@@ -2286,7 +2353,12 @@ async function save(msg){
   try{ await put(`data/${s.domain}/topics.json`,s.doc,msg); }
   catch(e){ toast("Kaydedilemedi: "+e.message); throw e; }
 }
+/* "Simdi calistir" GUNLUK ICERIK TURUNU baslatir — yazi yazar, gorsel
+   uretir, yayinlar ve para harcar. Olcumu tazelemez (onun dugmesi
+   Analitik ekraninda). Yanlislikla basilmasin diye onay soruluyor. */
 async function runNow(){
+  if(!confirm("Günlük içerik turu başlatılsın mı?\n\nYazı yazılır, görsel üretilir ve yayınlanır — model çağrısı yapıldığı için para harcar.\n\nSadece ekrandaki rakamları tazelemek istiyorsan \"Yenile\" yeter."))
+    return;
   const b=$("runBtn"); b.disabled=true; b.textContent="başlatılıyor…";
   try{
     await gh("/actions/workflows/daily.yml/dispatches",
