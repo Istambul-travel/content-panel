@@ -1825,7 +1825,7 @@ function vCust(){
     const uret=c.uretildi?new Date(c.uretildi).toLocaleString("tr-TR"):"—";
     const bagli=i.bagli_kademe==null?"—":i.bagli_kademe+" / "+(i.kademe_toplam||4)+" bağlı";
     return `<tr>
-      <td><strong>${esc(c.ad||c.domain)}</strong><div class="sub">${esc(c.domain)}${c.plan?" · "+esc(c.plan):""}</div></td>
+      <td><strong>${esc(c.ad||c.domain)}</strong><div class="sub">${c.marka_adi_yok?"marka adı tanımlı değil — <code>business.brand_name</code>":esc(c.domain)}${c.plan?" · "+esc(c.plan):""}</div></td>
       <td>${kur}${bekle}${atla}</td>
       <td>${isiklar}<div class="sub">${esc(bagli)}</div></td>
       <td>${c.toplam_yazi==null?"—":esc(String(c.toplam_yazi))} / ${c.toplam_gonderi==null?"—":esc(String(c.toplam_gonderi))}</td>
