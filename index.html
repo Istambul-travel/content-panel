@@ -2553,6 +2553,13 @@ async function onayYayinla(){
 
 /* ---------- Site ekle ---------- */
 function vAdd(){
+  function sec(id,et,secenekler,aciklama){
+    var o = secenekler.map(function(s){
+      return '<option value="'+s[0]+'">'+s[1]+'</option>'; }).join("");
+    return '<label style="display:block;margin-bottom:10px"><div class="sub" style="margin-bottom:4px">'+et+'</div>'
+      +'<select id="'+id+'" onchange="hedefDegisti()" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px">'+o+'</select>'
+      +(aciklama?'<div class="sub" style="margin-top:4px">'+aciklama+'</div>':'')+'</label>';
+  }
   function sat(id,et,ph,val){
     return '<label style="display:block;margin-bottom:10px"><div class="sub" style="margin-bottom:4px">'+et+'</div>'
       +'<input id="'+id+'" placeholder="'+(ph||"")+'" value="'+(val||"")+'" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px"></label>';
@@ -2563,6 +2570,14 @@ function vAdd(){
    +'<p class="sub" style="margin:6px 0 14px">Form, <code>Yeni site ekle</code> i&#351; ak&#305;&#351;&#305;n&#305; tetikler. &#304;&#351; ak&#305;&#351;&#305; sitenin WordPress&#39;ine ba&#287;lan&#305;p <b>ger&#231;ek kategorileri, yazar kimli&#287;ini ve sitemap adreslerini</b> okur; kategori listesi elle yaz&#305;lm&#305;yor. Site <b>shadow</b> modda ba&#351;lar &mdash; &#252;retir, yay&#305;nlamaz.</p>'
    +sat("naDom","Alan ad&#305;","istanbulturkishbath.com")
    +sat("naSlug","K&#305;sa ad &mdash; secret adlar&#305;nda kullan&#305;l&#305;r","turkishbath")
+   +sec("naHedef","Yay&#305;n hedefi &mdash; STANDART 16",
+        [["wordpress","WordPress"],
+         ["disa_aktarma","D&#305;&#351;a aktarma (hi&#231;bir ba&#287;lant&#305; gerekmez)"],
+         ["webhook","Webhook / JSON"]],
+        "D&#305;&#351;a aktarma bir ar&#305;za modu de&#287;il: yaz&#305; Markdown ve HTML dosyas&#305; olarak &#231;&#305;kar. WordPress d&#305;&#351;&#305; hedeflerde foto&#287;raf kademesi stok ve yapay zekadan ba&#351;lar &mdash; medya k&#252;t&#252;phanesi yaln&#305;z WordPress&#39;te var.")
+   +'<div id="naHedefUrlSar" style="display:none">'
+   +sat("naHedefUrl","Webhook adresi (https)","https://ornek.com/kanca")
+   +'</div>'
    +sat("naBrand","Marka ad&#305;","Istanbul Turkish Bath")
    +sat("naIg","Instagram kullan&#305;c&#305; ad&#305; (@ olmadan)","istanbulturkishbath")
    +sat("naDna","Site DNA&#39;s&#305; (STANDART 12) &mdash; kendi markalar&#305;m&#305;z: travelpedia &middot; m&#252;&#351;teri i&#231;in m&#252;&#351;terinin k&#305;sa ad&#305;. Kardes siteler ve &#351;ehir buradan gelir; bo&#351; b&#305;rak&#305;lamaz.","travelpedia")
@@ -2588,6 +2603,12 @@ function vAdd(){
    +'</div></div>';
 }
 
+function hedefDegisti(){
+  var s = $("naHedef"), k = $("naHedefUrlSar");
+  if(!s || !k) return;
+  k.style.display = (s.value === "webhook") ? "" : "none";
+}
+
 async function siteOlustur(){
   function v(id){ return ($(id).value||"").trim(); }
   var dom = v("naDom").toLowerCase().replace(/^https?:\/\//,"").replace(/\/+$/,"");
@@ -2595,6 +2616,12 @@ async function siteOlustur(){
   var out = $("naOut");
   if(!dom || dom.indexOf(".") < 0){ toast("Alan adi gerekli"); return; }
   if(!/^[a-z0-9][a-z0-9-]{1,40}$/.test(v("naDna").toLowerCase())){ toast("DNA gerekli: kendi sitelerimiz icin travelpedia, musteri icin musterinin kisa adi"); return; }
+  // STANDART 16 §4: webhook hedefi adres olmadan kurulamaz. Is akisi da
+  // reddediyor, ama hatayi burada soylemek bir tur beklemekten iyidir.
+  var hed = ($("naHedef") && $("naHedef").value) || "wordpress";
+  var hedUrl = v("naHedefUrl");
+  if(hed === "webhook" && hedUrl.indexOf("https://") !== 0){
+    toast("Webhook hedefi icin https adresi gerekli"); return; }
   var b = $("naBtn"); b.disabled = true; b.textContent = "baslatiliyor...";
   try{
     await gh("/actions/workflows/add-site.yml/dispatches", {method:"POST",
@@ -2606,7 +2633,9 @@ async function siteOlustur(){
         instagram: v("naIg").replace(/^@/,""),
         dna: v("naDna").toLowerCase(),
         accent: v("naAccent") || "#c9972f",
-        gsc_property: v("naGsc")
+        gsc_property: v("naGsc"),
+        hedef: hed,
+        hedef_url: hedUrl
       }})});
     out.innerHTML = '<div class="card"><div style="padding:12px">'
       +'<b>Kurulum ba&#351;lat&#305;ld&#305;.</b>'
