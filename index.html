@@ -301,6 +301,12 @@ tbody tr:hover{background:var(--raised)}
 .score .boost{display:block;font-size:10px;letter-spacing:.04em;text-transform:uppercase;
   color:var(--amber);font-variant-numeric:normal}
 .kwrow .m .muted{opacity:.6;font-style:italic}
+.isik{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:560;background:var(--line-2);color:var(--muted);white-space:nowrap;margin-right:3px}
+.isik.bagli{background:var(--ok-soft);color:var(--ok)}
+.isik.sorunlu{background:var(--amber-soft);color:var(--amber)}
+.isik .nk{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.85}
+.riskrow{font-size:12px;color:var(--red);margin-top:4px}
+.riskrow.sari{color:var(--amber)}
 .acts{display:flex;gap:6px;align-items:center}
 
 /* ---------- aday kelimeler ---------- */
@@ -470,6 +476,7 @@ td.sparktd{width:150px}
       <button data-v="soc" data-ico="share" onclick="go('soc')"><span>Sosyal medya</span><span class="count" id="cSoc">0</span></button>
  <button data-v="pub" data-ico="check" onclick="go('pub')"><span>Yayınlananlar</span><span class="count" id="cPub">0</span></button>
       <div class="lbl">Denetim</div>
+      <button data-v="cust" data-ico="globe" onclick="go('cust')"><span>Müşteriler</span><span class="count" id="cCust">0</span></button>
       <button data-v="sc" data-ico="chart" onclick="go('sc')"><span>Analitik</span></button>
       <button data-v="seo" data-ico="gauge" onclick="go('seo')"><span>SEO skoru</span><span class="count" id="cSeo">0</span></button>
       <button data-v="qa" data-ico="shield" onclick="go('qa')"><span>Kalite kapısı</span><span class="count" id="cQa">0</span></button>
@@ -652,6 +659,10 @@ async function load(){
   S.sites=out;
   if(!S.cur||!out.some(s=>s.domain===S.cur)) S.cur=out.length?out[0].domain:null;
   S.runs=((await gh("/actions/runs?per_page=15"))||{}).workflow_runs||[];
+  // Musteriler ekraninin tek kaynagi (STANDART 5 §12.6). Site basina degil,
+  // bir kez okunuyor: dosya butun musterileri tasiyor.
+  S.musteriler=await ghJson("data/musteriler.json")||null;
+  {const kel=$("cCust"); if(kel) kel.textContent=String((S.musteriler&&S.musteriler.kirmizi)||0);}
   // Tek site varken seçici gizlenir, domain marka başlığının altına yazılır.
   $("sitePick").hidden = out.length < 2;
   $("brandSub").textContent = out.length===1 ? out[0].domain : "Travelpedia";
@@ -687,6 +698,7 @@ function render(){
     sc:["Analitik","Yazıların getirisi ve Google arama ölçümü"],
     soc:["Sosyal medya","Haftanın gönderileri ve elle müdahale"],
    pub:["Yayınlananlar","Çıkan yazılar, dilleri ve gönderileri — canlıdaki hâliyle"],
+    cust:["Müşteriler","Her müşterinin kurulumu, bağlantıları ve riski — kırmızı satır önce"],
     sites:["Site ve markalar","Yayın yapılan site ve yazıların yönlendirdiği markalar"],
     cost:["Maliyet","Her turun gerçek para karşılığı"],
     std:["Standartlar","Motorun uyduğu kurallar — verilen kararların tam listesi"],
@@ -694,7 +706,7 @@ function render(){
     add:["Site ekle","Yeni bir siteyi sisteme tanıt"],
   }[VIEW];
   $("ttl").textContent=meta[0]; $("sub").textContent=meta[1];
-  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,sites:vSites,sc:vSC,soc:vSoc,pub:vPub,cost:vCost,std:vStd,fix:vFix,add:vAdd})[VIEW]();
+  $("view").innerHTML=({dash:vDash,cal:vCal,kw:vKw,cand:vCand,seo:vSeo,qa:vQa,runs:vRuns,cust:vCust,sites:vSites,sc:vSC,soc:vSoc,pub:vPub,cost:vCost,std:vStd,fix:vFix,add:vAdd})[VIEW]();
 }
 
 /* ===================== analitik (Search Console) =====================
@@ -1778,6 +1790,53 @@ function vQa(){
       Girişe konmuş ticari link ·
       Eksik veya kısa SSS bölümü
     </div></div>`;
+}
+
+/* Müşteriler — STANDART 5 §12.3. Kaynak: data/musteriler.json
+   (engine/kurulum.musteriler). Satırlar RİSKE göre sıralı geliyor; ekranı
+   açan önce yanan satırı görür, alfabetik liste taramaz.
+   Yüzdelik kurulum rozeti BİLEREK yok: beş senaryoda yanıltıcı çıktı
+   (hiçbir şey bağlamayan müşteri "%43" görüyordu, oysa kurulumu bitmişti).
+   Yerine iki ayrı gösterge: "zorunlu bitti mi" ve "kaç kademe bağlı". */
+const KADEME_ADI={yayin:"Yayın",olcum:"Ölçüm",sosyal:"Sosyal",fotograf:"Fotoğraf"};
+
+function isikPill(ad,durum){
+  /* 'yok' KIRMIZI DEGIL (STANDART 5 §12.4): baglanmamis bir olcum bozuk
+     degildir, bir karardir. Kirmizi yalnizca gercek arizaya ayrilir. */
+  const sinif=durum==="bagli"?"bagli":durum==="sorunlu"?"sorunlu":"";
+  const not=durum==="bagli"?"bağlı":durum==="sorunlu"?"koptu":"bağlı değil";
+  return `<span class="isik ${sinif}" title="${esc(KADEME_ADI[ad]+": "+not)}"><span class="nk"></span>${esc(KADEME_ADI[ad])}</span>`;
+}
+
+function vCust(){
+  const m=S.musteriler;
+  if(!m||!m.musteri||!m.musteri.length)
+    return empty("globe","Müşteri özeti yok","Ölçüm turu data/musteriler.json üretmedi. Analitik turu bir kez çalışınca burası dolar.");
+  const satirlar=m.musteri.map(c=>{
+    const i=c.ilerleme||{};
+    const kur=i.zorunlu_bitti
+      ? '<span class="pill">tamam</span>'
+      : `<span class="pill bad">eksik: ${esc((i.eksik||[]).join(", ")||"?")}</span>`;
+    const bekle=(i.beklemede||[]).length?`<div class="sub">sırası gelmedi: ${esc(i.beklemede.join(", "))}</div>`:"";
+    const atla=(i.atlanan||[]).length?`<div class="sub">atlandı: ${esc(i.atlanan.join(", "))}</div>`:"";
+    const isiklar=["yayin","olcum","sosyal","fotograf"].map(x=>isikPill(x,(c.isiklar||{})[x])).join(" ");
+    const riskler=(c.riskler||[]).map(r=>`<div class="riskrow ${r.seviye==="sari"?"sari":""}">${esc(r.mesaj)}</div>`).join("")
+      ||'<span style="color:var(--muted)">—</span>';
+    const uret=c.uretildi?new Date(c.uretildi).toLocaleString("tr-TR"):"—";
+    const bagli=i.bagli_kademe==null?"—":i.bagli_kademe+" / "+(i.kademe_toplam||4)+" bağlı";
+    return `<tr>
+      <td><strong>${esc(c.ad||c.domain)}</strong><div class="sub">${esc(c.domain)}${c.plan?" · "+esc(c.plan):""}</div></td>
+      <td>${kur}${bekle}${atla}</td>
+      <td>${isiklar}<div class="sub">${esc(bagli)}</div></td>
+      <td>${c.toplam_yazi==null?"—":esc(String(c.toplam_yazi))} / ${c.toplam_gonderi==null?"—":esc(String(c.toplam_gonderi))}</td>
+      <td>${riskler}</td>
+      <td style="color:var(--muted)">${esc(uret)}</td></tr>`;
+  }).join("");
+  const ust=`<div class="sub" style="margin:0 0 12px">${m.toplam} müşteri · ${m.kirmizi} kırmızı · ${m.sari} sarı — satırlar riske göre sıralı.</div>`;
+  return `<div class="panelbox" style="margin-top:0"><header><h2>Müşteriler</h2></header>
+    <div style="padding:14px 17px 0">${ust}</div>
+    <div class="tw"><table><thead><tr><th>Müşteri</th><th>Kurulum</th><th>Bağlantılar</th><th>Yazı / Gönderi</th><th>Risk</th><th>Son özet</th></tr></thead>
+    <tbody>${satirlar}</tbody></table></div></div>`;
 }
 
 function vRuns(){
